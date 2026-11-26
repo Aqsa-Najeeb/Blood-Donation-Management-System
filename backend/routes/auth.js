@@ -163,6 +163,10 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
         return res.status(401).json({ error: "Invalid email or password." });
       }
 
+      if (user.deactivatedAt) {
+        return res.status(401).json({ error: "This account has been deactivated." });
+      }
+
       const match = await bcrypt.compare(String(password), user.passwordHash);
       if (!match) {
         recordFailure(lockKey);
@@ -191,8 +195,8 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
       const fresh = await prisma.user.findUnique({
         where: { id: req.user.id },
       });
-      if (!fresh) {
-        return res.status(404).json({ error: "User not found." });
+      if (!fresh || fresh.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
       }
       return res.json({ user: sanitizeUser(fresh, { includePrivate: true }) });
     } catch (err) {

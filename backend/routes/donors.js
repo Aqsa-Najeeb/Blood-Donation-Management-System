@@ -10,7 +10,7 @@ function createDonorsRouter(prisma) {
     try {
       const counts = await prisma.user.groupBy({
         by: ["bloodGroup"],
-        where: { isDonor: true, available: true },
+        where: { isDonor: true, available: true, deactivatedAt: null },
         _count: { id: true },
       });
       const dbMap = new Map(counts.map((c) => [c.bloodGroup, c._count.id]));
@@ -38,7 +38,7 @@ function createDonorsRouter(prisma) {
     try {
       const { bloodGroup, radius, availableOnly, search, sort } = req.query;
 
-      const where = { isDonor: true, seenLabel: { not: "Deactivated" } };
+      const where = { isDonor: true, deactivatedAt: null };
       if (bloodGroup && bloodGroup !== "All") {
         const bg = String(bloodGroup).trim().toUpperCase();
         if (!VALID_BLOOD_GROUPS.has(bg)) {
@@ -90,7 +90,7 @@ function createDonorsRouter(prisma) {
         return res.status(400).json({ error: "Invalid donor id." });
       }
       const donor = await prisma.user.findFirst({
-        where: { id, isDonor: true, seenLabel: { not: "Deactivated" } },
+        where: { id, isDonor: true, deactivatedAt: null },
       });
       if (!donor) {
         return res.status(404).json({ error: "Donor not found." });

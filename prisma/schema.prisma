@@ -54,11 +54,13 @@ model User {
   shortArea            String              @default("Model Town") @db.VarChar(80)
   distanceKm           Float               @default(3.5)
   donorIdCode          String?             @unique @db.VarChar(24)
-  available            Boolean             @default(true)
+  available            Boolean             @default(false)
   online               Boolean             @default(true)
   seenLabel            String              @default("Available Now") @db.VarChar(60)
   replyLabel           String              @default("< 15 mins") @db.VarChar(40)
   lastConfirmedAt      DateTime            @default(now())
+  lastAvailabilityUpdate DateTime?
+  deactivatedAt        DateTime?
   strictPhoneShielding Boolean             @default(true)
   matchingRadiusKm     Int                 @default(10)
   safetyFlags          Int                 @default(0)

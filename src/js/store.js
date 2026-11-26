@@ -569,6 +569,7 @@ function mapApiUser(u, prevUser) {
     area: u.area || "Model Town & Surrounds",
     donorId: u.donorIdCode || prevUser?.donorId || "",
     available: u.available ?? false,
+    lastAvailabilityUpdate: u.lastAvailabilityUpdate || null,
     lastConfirmed: "Synced with MySQL",
     matchingRadius: u.matchingRadiusKm ?? 10,
     safetyFlags: u.safetyFlags ?? 0,
@@ -1208,6 +1209,65 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
+  const saveProfile = async (form) => {
+    try {
+      const res = await apiFetch("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          name: form.name,
+          bloodGroup: form.blood,
+          city: form.city,
+          area: form.area,
+          phone: form.phone,
+        }),
+      });
+      if (res.user) setUser((prev) => mapApiUser(res.user, prev));
+      showToast("Profile updated.");
+      return true;
+    } catch (err) {
+      showToast(err.message, "warn");
+      return false;
+    }
+  };
+
+  const enableDonorMode = async () => {
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify({ isDonor: true }),
+      });
+      if (res.user) setUser((prev) => mapApiUser(res.user, prev));
+      showToast("Donor mode enabled (starting as Unavailable).");
+    } catch (err) {
+      showToast(err.message, "warn");
+    }
+  };
+
+  const toggleDonorAvailability = async (nextAvailable) => {
+    try {
+      const res = await apiFetch("/api/donor/availability", {
+        method: "PATCH",
+        body: JSON.stringify({ available: Boolean(nextAvailable) }),
+      });
+      if (res.user) setUser((prev) => mapApiUser(res.user, prev));
+      showToast(`Availability set to ${nextAvailable ? "Available" : "Unavailable"}.`);
+    } catch (err) {
+      showToast(err.message, "warn");
+    }
+  };
+
+  const deleteAccount = async () => {
+    try {
+      await apiFetch("/api/settings/account", { method: "DELETE" });
+      localStorage.removeItem(TOKEN_KEY);
+      setUser(INITIAL_USER);
+      showToast("Account deactivated and anonymised.", "info");
+      navigate("/");
+    } catch (err) {
+      showToast(err.message, "warn");
+    }
+  };
+
   const logoutUser = () => {
     localStorage.removeItem(TOKEN_KEY);
     setUser((prev) => ({ ...prev, loggedIn: false }));
@@ -1271,6 +1331,10 @@ function AppProvider({ children, defaultRoute }) {
         loginUser,
         signupUser,
         saveSettings,
+        saveProfile,
+        enableDonorMode,
+        toggleDonorAvailability,
+        deleteAccount,
         submitSafetyReport,
         logoutUser,
         resetDemoData,

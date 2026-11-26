@@ -9,6 +9,7 @@ const {
   parsePositiveInt,
   isValidEmail,
   isStrongPassword,
+  isValidPhone,
   normalizeReportCategory,
 } = require("../utils/validators");
 
@@ -18,6 +19,8 @@ const PROTECTED_USER_FIELDS = [
   "restrictedUntil",
   "donorIdCode",
   "passwordHash",
+  "lastAvailabilityUpdate",
+  "deactivatedAt",
 ];
 
 const REPORT_THRESHOLD = 3;
@@ -26,15 +29,29 @@ const RESTRICTION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 function createSettingsRouter(prisma, { reportLimiter } = {}) {
   const router = express.Router();
 
-  // PUT /api/settings
-  router.put("/settings", requireAuth, async (req, res, next) => {
+  async function updateProfileHandler(req, res, next, { requireAllProfileFields = false } = {}) {
     try {
+      if (req.params.id !== undefined) {
+        const targetId = parsePositiveInt(req.params.id);
+        if (!targetId) {
+          return res.status(400).json({ error: "Invalid user id." });
+        }
+        if (targetId !== req.user.id) {
+          return res.status(403).json({ error: "Forbidden: you can only edit your own profile." });
+        }
+      }
+
       const body = req.body || {};
 
       for (const field of PROTECTED_USER_FIELDS) {
         if (Object.prototype.hasOwnProperty.call(body, field)) {
           return res.status(403).json({ error: `Forbidden: field '${field}' cannot be modified.` });
         }
+      }
+
+      const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!currentUser || currentUser.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
       }
 
       const {
@@ -49,6 +66,14 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
         strictPhoneShielding,
         matchingRadiusKm,
       } = body;
+
+      if (requireAllProfileFields) {
+        if (!name || !bloodGroup || !city || !area || !phone) {
+          return res.status(400).json({
+            error: "Full name, blood group, city, area, and contact number are all required.",
+          });
+        }
+      }
 
       const data = {};
       if (name !== undefined) {
@@ -71,7 +96,12 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
         }
         data.email = normalizedEmail;
       }
-      if (phone !== undefined) data.phone = sanitizeText(phone, 30);
+      if (phone !== undefined) {
+        if (!isValidPhone(phone)) {
+          return res.status(400).json({ error: "A valid contact phone number is required." });
+        }
+        data.phone = sanitizeText(phone, 30);
+      }
       if (bloodGroup !== undefined) {
         const bg = String(bloodGroup).trim().toUpperCase();
         if (!VALID_BLOOD_GROUPS.has(bg)) {
@@ -79,10 +109,37 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
         }
         data.bloodGroup = bg;
       }
-      if (city !== undefined) data.city = sanitizeText(city, 80);
-      if (area !== undefined) data.area = sanitizeText(area, 160);
-      if (isDonor !== undefined) data.isDonor = Boolean(isDonor);
-      if (available !== undefined) data.available = Boolean(available);
+      if (city !== undefined) {
+        const cleanCity = sanitizeText(city, 80);
+        if (cleanCity.length < 2) {
+          return res.status(400).json({ error: "city is required." });
+        }
+        data.city = cleanCity;
+      }
+      if (area !== undefined) {
+        const cleanArea = sanitizeText(area, 160);
+        if (cleanArea.length < 2) {
+          return res.status(400).json({ error: "area is required." });
+        }
+        data.area = cleanArea;
+        data.shortArea = cleanArea.split(",")[0].trim().slice(0, 80) || cleanArea;
+      }
+      if (isDonor !== undefined) {
+        const nextIsDonor = Boolean(isDonor);
+        data.isDonor = nextIsDonor;
+        if (!currentUser.isDonor && nextIsDonor) {
+          // New donors always start Unavailable
+          data.available = false;
+        }
+      }
+      if (available !== undefined && !(isDonor !== undefined && !currentUser.isDonor && Boolean(isDonor))) {
+        const nextAvailable = Boolean(available);
+        if (nextAvailable !== currentUser.available) {
+          data.available = nextAvailable;
+          data.lastAvailabilityUpdate = now();
+          data.seenLabel = nextAvailable ? "Available Now" : "Unavailable";
+        }
+      }
       if (strictPhoneShielding !== undefined) data.strictPhoneShielding = Boolean(strictPhoneShielding);
       if (matchingRadiusKm !== undefined) {
         const r = Number(matchingRadiusKm);
@@ -99,13 +156,24 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
       });
 
       return res.json({
-        message: "Settings updated successfully.",
+        message: "Profile updated successfully.",
         user: sanitizeUser(updated, { includePrivate: true }),
       });
     } catch (err) {
       return next(err);
     }
-  });
+  }
+
+  // PUT /api/settings
+  router.put("/settings", requireAuth, (req, res, next) => updateProfileHandler(req, res, next));
+
+  // PUT /api/profile and PUT /api/profile/:id
+  router.put("/profile", requireAuth, (req, res, next) =>
+    updateProfileHandler(req, res, next, { requireAllProfileFields: true })
+  );
+  router.put("/profile/:id", requireAuth, (req, res, next) =>
+    updateProfileHandler(req, res, next, { requireAllProfileFields: true })
+  );
 
   // PUT /api/settings/password
   router.put("/settings/password", requireAuth, async (req, res, next) => {
@@ -146,11 +214,21 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
   // DELETE /api/settings/account
   router.delete("/settings/account", requireAuth, async (req, res, next) => {
     try {
+      const deactivatedAt = now();
       await prisma.user.update({
         where: { id: req.user.id },
-        data: { available: false, online: false, seenLabel: "Deactivated" },
+        data: {
+          deactivatedAt,
+          available: false,
+          online: false,
+          isDonor: false,
+          seenLabel: "Deactivated",
+          name: "Deleted user",
+          email: `deleted_${req.user.id}_${deactivatedAt.getTime()}@deleted.local`,
+          phone: "Deleted",
+        },
       });
-      return res.json({ message: "Account deactivated and hidden from public donor discovery." });
+      return res.json({ message: "Account deactivated and personal details anonymised." });
     } catch (err) {
       return next(err);
     }

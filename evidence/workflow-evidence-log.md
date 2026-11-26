@@ -3,7 +3,7 @@
 | Slice | Requirements | Lead member | Acceptance criteria | Mode HITL/AFK | AI chat reference | Iterations | Test result | Human decision | Major issue | Plan version | Integration status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | A1 Foundation, cleanup, sign-in | FR-01, FR-02 | Member 1 | Single account model, no CNIC/verification, bcrypt hashing, rate limiting | HITL | Current session | 2 | `npm.cmd run test:all`: smoke.js passed; 36/36 in tests/a1.test.js passed (`lifelink_test`) | | Legacy `tests/api.test.js` still targets old prototype schema (`role`/`newsletter`) | v02 | Implemented (pending human review) |
-| A2 Profile and availability | FR-03, FR-04 | Member 2 | Unavailable default, manual toggle, unverified blood group, account deactivation/anonymization | | | | | | | v02 | Planned |
+| A2 Profile and availability | FR-03, FR-04 | Member 2 | Unavailable default, manual toggle, unverified blood group, account deactivation/anonymization | HITL | Current session | 1 | `npm.cmd run test:all`: smoke.js passed; 45/45 passed (36 A1 + 9 A2 on `lifelink_test`) | | None | v02 | Implemented (pending human review) |
 | A3 Search, ordering, freshness, contact | FR-05, FR-06, FR-07 | Member 3 | Haversine distance, no stored distanceKm, show both availability states, privacy shielding | | | | | | | v02 | Planned |
 | B1 Create request and visibility | FR-08 | Member 1 | D1 fields, units 1–6, max 3 active requests, blood-group matching visibility | | | | | | | v02 | Planned |
 | B2 Donor responses and requester decisions | FR-10, FR-11 | Member 2 | Pending/Accepted/Declined responses, None/Approved/Rejected decisions, phone revealed only upon approval | | | | | | | v02 | Planned |

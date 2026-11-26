@@ -1,10 +1,12 @@
 function sanitizeUser(user, { includePrivate = false } = {}) {
   if (!user) return null;
 
+  const isDeactivated = Boolean(user.deactivatedAt);
+
   const base = {
     id: user.id,
-    name: user.name,
-    username: user.username,
+    name: isDeactivated ? "Deleted user" : user.name,
+    username: isDeactivated ? "deleted_user" : user.username,
     bloodGroup: user.bloodGroup,
     city: user.city,
     area: user.area,
@@ -19,16 +21,18 @@ function sanitizeUser(user, { includePrivate = false } = {}) {
     matchingRadiusKm: user.matchingRadiusKm,
     safetyFlags: user.safetyFlags,
     restrictedUntil: user.restrictedUntil,
+    lastAvailabilityUpdate: user.lastAvailabilityUpdate || null,
+    deactivatedAt: user.deactivatedAt || null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
 
-  if (includePrivate) {
+  if (includePrivate && !isDeactivated) {
     base.email = user.email;
     base.phone = user.phone;
     base.strictPhoneShielding = user.strictPhoneShielding;
   } else {
-    base.phone = user.phone ? maskPhone(user.phone) : null;
+    base.phone = isDeactivated ? null : user.phone ? maskPhone(user.phone) : null;
   }
 
   return base;

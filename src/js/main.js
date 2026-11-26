@@ -4,6 +4,7 @@ const { HomePage, AboutPage, HowItWorksPage, SafetyFaqsPage } = window.LifeLinkP
 const { FindDonorsPage, CreateRequestPage, RequestTrackPage } = window.LifeLinkMatchingPages;
 const { DonorDashboardPage, RecipientDashboardPage, DonorProfilePage } = window.LifeLinkDashboardPages;
 const { ChatPage, PrivacySettingsPage, LoginPage, SignupPage } = window.LifeLinkAccountPages;
+const { ProfilePage } = window.LifeLinkProfilePages || {};
 
 function RouterView() {
   const { route } = useApp();
@@ -33,7 +34,9 @@ function RouterView() {
       case "/safety-faqs":
         return <SafetyFaqsPage />;
       case "/privacy-settings":
-        return <PrivacySettingsPage />;
+        return ProfilePage ? <ProfilePage /> : <PrivacySettingsPage />;
+      case "/profile":
+        return ProfilePage ? <ProfilePage /> : <PrivacySettingsPage />;
       case "/login":
         return <LoginPage />;
       case "/signup":
