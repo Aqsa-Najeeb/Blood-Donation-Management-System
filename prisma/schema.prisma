@@ -14,17 +14,26 @@ enum UrgencyLevel {
 }
 
 enum RequestStatus {
-  ACTIVE
-  FULFILLED
-  CANCELLED
+  OPEN
+  CLOSED
 }
 
-enum InvitationStatus {
+enum ClosureReason {
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum DonorResponseStatus {
   PENDING
   ACCEPTED
-  ON_HOLD
   DECLINED
-  DONATED
+}
+
+enum RequesterDecisionStatus {
+  NONE
+  APPROVED
+  REJECTED
 }
 
 enum SenderRole {
@@ -68,7 +77,7 @@ model User {
   updatedAt            DateTime            @updatedAt
 
   createdRequests      BloodRequest[]      @relation("RequesterRequests")
-  invitations          RequestInvitation[] @relation("DonorInvitations")
+  responses            RequestResponse[]   @relation("DonorResponses")
   donorThreads         ChatThread[]        @relation("DonorThreads")
   recipientThreads     ChatThread[]        @relation("RecipientThreads")
   sentMessages         ChatMessage[]
@@ -82,63 +91,51 @@ model User {
 }
 
 model BloodRequest {
-  id               Int           @id @default(autoincrement())
-  code             String        @unique @db.VarChar(24)
-  requesterId      Int
-  bloodGroup       String        @db.VarChar(5)
-  units            Int           @default(1)
-  caseCategory     String        @db.VarChar(120)
-  urgency          UrgencyLevel  @default(URGENT)
-  hospital         String        @db.VarChar(160)
-  ward             String        @default("Transfusion Ward") @db.VarChar(120)
-  city             String        @default("Lahore, Punjab") @db.VarChar(100)
-  requiredBy       String        @db.VarChar(80)
-  patientName      String        @db.VarChar(120)
-  attendantName    String        @db.VarChar(120)
-  doctorName       String        @default("Duty Hematology Officer") @db.VarChar(120)
-  labId            String        @db.VarChar(40)
-  crossMatchStatus String        @default("Awaiting Donor Sample") @db.VarChar(100)
-  slipNumber       String        @db.VarChar(24)
-  stage            Int           @default(1)
-  status           RequestStatus @default(ACTIVE)
-  notes            String?       @db.Text
-  rating           Int?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id            Int            @id @default(autoincrement())
+  code          String         @unique @db.VarChar(24)
+  requesterId   Int
+  bloodGroup    String         @db.VarChar(5)
+  hospital      String         @db.VarChar(160)
+  city          String         @default("Lahore") @db.VarChar(80)
+  area          String         @db.VarChar(160)
+  radius        Int            @default(10)
+  requiredDate  DateTime
+  units         Int            @default(1)
+  urgency       UrgencyLevel   @default(URGENT)
+  contactPhone  String         @db.VarChar(30)
+  message       String?        @db.Text
+  status        RequestStatus  @default(OPEN)
+  closureReason ClosureReason?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  requester   User                @relation("RequesterRequests", fields: [requesterId], references: [id], onDelete: Cascade)
-  invitations RequestInvitation[]
-  threads     ChatThread[]
+  requester User              @relation("RequesterRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  responses RequestResponse[]
+  threads   ChatThread[]
 
   @@index([status, bloodGroup])
   @@index([requesterId])
   @@map("blood_requests")
 }
 
-model RequestInvitation {
-  id            Int              @id @default(autoincrement())
-  requestId     Int
-  donorId       Int
-  status        InvitationStatus @default(PENDING)
-  eta           String?          @db.VarChar(40)
-  targetTime    String?          @db.VarChar(40)
-  distanceLabel String?          @db.VarChar(40)
-  trafficNote   String?          @db.VarChar(60)
-  pulseStatus   String?          @db.VarChar(40)
-  pulseNote     String?          @db.VarChar(80)
-  reason        String?          @db.Text
-  declineReason String?          @db.VarChar(120)
-  donorStep     Int              @default(1)
-  respondedAt   String           @default("Invited just now") @db.VarChar(80)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+model RequestResponse {
+  id                Int                     @id @default(autoincrement())
+  requestId         Int
+  donorId           Int
+  donorResponse     DonorResponseStatus     @default(PENDING)
+  requesterDecision RequesterDecisionStatus @default(NONE)
+  distanceKm        Float?
+  respondedAt       DateTime?
+  decidedAt         DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   request BloodRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  donor   User         @relation("DonorInvitations", fields: [donorId], references: [id], onDelete: Cascade)
+  donor   User         @relation("DonorResponses", fields: [donorId], references: [id], onDelete: Cascade)
 
   @@unique([requestId, donorId])
-  @@index([donorId, status])
-  @@map("request_invitations")
+  @@index([donorId, donorResponse])
+  @@map("request_responses")
 }
 
 model ChatThread {

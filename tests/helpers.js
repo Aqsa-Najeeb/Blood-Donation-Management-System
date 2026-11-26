@@ -15,7 +15,7 @@ async function resetTestDb(prisma) {
   await prisma.notification.deleteMany();
   await prisma.chatMessage.deleteMany();
   await prisma.chatThread.deleteMany();
-  await prisma.requestInvitation.deleteMany();
+  await prisma.requestResponse.deleteMany();
   await prisma.bloodRequest.deleteMany();
   await prisma.user.deleteMany();
 }

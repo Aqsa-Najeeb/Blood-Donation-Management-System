@@ -6,6 +6,7 @@ const { DonorDashboardPage, RecipientDashboardPage, DonorProfilePage } = window.
 const { ChatPage, PrivacySettingsPage, LoginPage, SignupPage } = window.LifeLinkAccountPages;
 const { ProfilePage } = window.LifeLinkProfilePages || {};
 const { SearchDonorsPage } = window.LifeLinkSearchPages || {};
+const { RequestsPage } = window.LifeLinkRequestPages || {};
 
 function RouterView() {
   const { route } = useApp();
@@ -17,7 +18,7 @@ function RouterView() {
       case "/find-donors":
         return SearchDonorsPage ? <SearchDonorsPage /> : <FindDonorsPage />;
       case "/request-blood":
-        return <CreateRequestPage />;
+        return RequestsPage ? <RequestsPage /> : <CreateRequestPage />;
       case "/donor-dashboard":
         return <DonorDashboardPage />;
       case "/recipient-dashboard":

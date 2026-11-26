@@ -1256,6 +1256,28 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
+  const fetchRequests = async () => {
+    try {
+      const res = await apiFetch("/api/requests");
+      return res.requests || [];
+    } catch {
+      return [];
+    }
+  };
+
+  const submitBloodRequest = async (form) => {
+    try {
+      const res = await apiFetch("/api/requests", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      showToast(`Request ${res.request?.code || ""} submitted.`);
+      return { request: res.request };
+    } catch (err) {
+      return { error: err.message };
+    }
+  };
+
   const searchDonors = async ({ bloodGroup, city, area, radius }) => {
     try {
       const qs = new URLSearchParams();
@@ -1359,6 +1381,8 @@ function AppProvider({ children, defaultRoute }) {
         toggleDonorAvailability,
         searchDonors,
         contactDonor,
+        fetchRequests,
+        submitBloodRequest,
         deleteAccount,
         submitSafetyReport,
         logoutUser,

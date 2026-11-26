@@ -43,20 +43,56 @@ function maskPhone(phone) {
   return `${p.slice(0, 4)}••••${p.slice(-3)}`;
 }
 
-function serializeRequest(requestItem) {
+function serializeRequest(requestItem, viewerId = null) {
   if (!requestItem) return null;
-  return {
-    ...requestItem,
+  const isOwner = viewerId !== null && requestItem.requesterId === viewerId;
+  const isApprovedDonor =
+    viewerId !== null &&
+    Array.isArray(requestItem.responses) &&
+    requestItem.responses.some((r) => r.donorId === viewerId && r.requesterDecision === "APPROVED");
+
+  const result = {
+    id: requestItem.id,
+    code: requestItem.code,
+    requesterId: requestItem.requesterId,
+    bloodGroup: requestItem.bloodGroup,
+    hospital: requestItem.hospital,
+    city: requestItem.city,
+    area: requestItem.area,
+    radius: requestItem.radius,
+    requiredDate: requestItem.requiredDate,
+    units: requestItem.units,
+    urgency: requestItem.urgency,
+    message: requestItem.message ?? null,
+    status: requestItem.status,
+    closureReason: requestItem.closureReason ?? null,
+    createdAt: requestItem.createdAt,
+    updatedAt: requestItem.updatedAt,
     requester: requestItem.requester
       ? sanitizeUser(requestItem.requester, { includePrivate: false })
       : undefined,
-    invitations: Array.isArray(requestItem.invitations)
-      ? requestItem.invitations.map((i) => ({
-          ...i,
-          donor: i.donor ? sanitizeUser(i.donor, { includePrivate: false }) : undefined,
+    responses: Array.isArray(requestItem.responses)
+      ? requestItem.responses.map((r) => ({
+          id: r.id,
+          requestId: r.requestId,
+          donorId: r.donorId,
+          donorResponse: r.donorResponse,
+          requesterDecision: r.requesterDecision,
+          distanceKm: r.distanceKm ?? null,
+          respondedAt: r.respondedAt ?? null,
+          decidedAt: r.decidedAt ?? null,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          donor: r.donor ? sanitizeUser(r.donor, { includePrivate: false }) : undefined,
         }))
       : undefined,
   };
+
+  if (isOwner || isApprovedDonor) {
+    result.contactPhone = requestItem.contactPhone;
+  }
+
+  return result;
 }
 
 function serializeSearchDonor(user, { distance, freshness, isOutdated }) {

@@ -56,8 +56,8 @@ function createDonorActionsRouter(prisma) {
   // GET /api/donor/alerts — strictly scoped to authenticated donor
   router.get("/alerts", requireAuth, async (req, res, next) => {
     try {
-      const alerts = await prisma.requestInvitation.findMany({
-        where: { donorId: req.user.id, status: { in: ["PENDING", "ACCEPTED"] } },
+      const alerts = await prisma.requestResponse.findMany({
+        where: { donorId: req.user.id, donorResponse: { in: ["PENDING", "ACCEPTED"] } },
         orderBy: { createdAt: "desc" },
         include: { request: true, donor: true },
       });
@@ -65,7 +65,7 @@ function createDonorActionsRouter(prisma) {
         count: alerts.length,
         alerts: alerts.map((a) => ({
           ...a,
-          request: a.request ? serializeRequest(a.request) : undefined,
+          request: a.request ? serializeRequest(a.request, req.user.id) : undefined,
           donor: a.donor ? sanitizeUser(a.donor, { includePrivate: false }) : undefined,
         })),
       });
