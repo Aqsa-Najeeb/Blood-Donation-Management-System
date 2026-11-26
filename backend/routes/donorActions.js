@@ -3,6 +3,7 @@ const { requireAuth } = require("../middleware/auth");
 const { sanitizeUser, serializeRequest } = require("../utils/serializers");
 const { parsePositiveInt, sanitizeText } = require("../utils/validators");
 const { now } = require("../utils/clock");
+const { expireDueRequests } = require("../modules/requestLifecycle");
 
 function createDonorActionsRouter(prisma) {
   const router = express.Router();
@@ -56,6 +57,7 @@ function createDonorActionsRouter(prisma) {
   // GET /api/donor/alerts — strictly scoped to authenticated donor
   router.get("/alerts", requireAuth, async (req, res, next) => {
     try {
+      await expireDueRequests(prisma);
       const alerts = await prisma.requestResponse.findMany({
         where: { donorId: req.user.id, donorResponse: { in: ["PENDING", "ACCEPTED"] } },
         orderBy: { createdAt: "desc" },

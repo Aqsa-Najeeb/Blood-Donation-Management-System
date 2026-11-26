@@ -7,6 +7,7 @@ const { findLocation } = require("../data/locations");
 const { findMatchingDonors } = require("../modules/matching");
 const { notify } = require("../modules/notifications");
 const { isRestricted } = require("../modules/restrictions");
+const { toPktDateString, expireDueRequests } = require("../modules/requestLifecycle");
 const {
   VALID_BLOOD_GROUPS,
   sanitizeText,
@@ -16,15 +17,6 @@ const {
 
 const MAX_ACTIVE_REQUESTS_PER_USER = 3;
 const ALLOWED_RADII = new Set([5, 10, 25, 50]);
-const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
-
-function toPktDateString(date) {
-  const pkt = new Date(date.getTime() + PKT_OFFSET_MS);
-  const y = pkt.getUTCFullYear();
-  const m = String(pkt.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(pkt.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 function parseRequiredDatePkt(input) {
   if (!input) return null;
@@ -91,6 +83,8 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
         return res.status(401).json({ error: "Account not found or deactivated." });
       }
 
+      await expireDueRequests(prisma);
+
       const { status } = req.query;
       const where = {
         OR: [{ requesterId: viewer.id }, { bloodGroup: viewer.bloodGroup }],
@@ -126,6 +120,8 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
       if (!viewer || viewer.deactivatedAt) {
         return res.status(401).json({ error: "Account not found or deactivated." });
       }
+
+      await expireDueRequests(prisma);
 
       const item = await findRequestByIdOrCode(req.params.idOrCode);
       if (!item || !canViewRequest(item, viewer)) {
@@ -293,6 +289,8 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
         return res.status(401).json({ error: "Account not found or deactivated." });
       }
 
+      await expireDueRequests(prisma);
+
       const item = await findRequestByIdOrCode(req.params.idOrCode);
       if (!item) {
         return res.status(404).json({ error: "Blood request not found." });
@@ -424,6 +422,8 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
         return res.status(401).json({ error: "Account not found or deactivated." });
       }
 
+      await expireDueRequests(prisma);
+
       const item = await findRequestByIdOrCode(req.params.idOrCode);
       if (!item) {
         return res.status(404).json({ error: "Blood request not found." });
@@ -468,6 +468,65 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
       return next(err);
     }
   });
+
+  function createCloseHandler(closureReason) {
+    return async (req, res, next) => {
+      try {
+        const viewer = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (!viewer || viewer.deactivatedAt) {
+          return res.status(401).json({ error: "Account not found or deactivated." });
+        }
+
+        await expireDueRequests(prisma);
+
+        const item = await findRequestByIdOrCode(req.params.idOrCode);
+        if (!item) {
+          return res.status(404).json({ error: "Blood request not found." });
+        }
+
+        if (item.requesterId !== viewer.id) {
+          return res.status(403).json({ error: "Only the requester who created this request can close it." });
+        }
+
+        if (item.status !== "OPEN") {
+          return res.status(409).json({
+            error: `Request is already closed (${item.closureReason || "CLOSED"}).`,
+          });
+        }
+
+        const updated = await prisma.bloodRequest.updateMany({
+          where: { id: item.id, status: "OPEN" },
+          data: { status: "CLOSED", closureReason },
+        });
+
+        if (updated.count === 0) {
+          return res.status(409).json({ error: "Request is already closed." });
+        }
+
+        const actionLabel = closureReason === "CANCELLED" ? "cancelled" : "marked as fulfilled";
+        const notifiedDonorIds = [...new Set((item.responses || []).map((r) => r.donorId))];
+        for (const donorId of notifiedDonorIds) {
+          await notify(donorId, {
+            type: closureReason === "CANCELLED" ? "REQUEST_CANCELLED" : "REQUEST_FULFILLED",
+            title: `Request ${item.code} ${actionLabel}`,
+            text: `The ${item.bloodGroup} blood request at ${item.hospital} has been ${actionLabel} by the requester.`,
+            link: `/request-track?id=${item.code}`,
+          });
+        }
+
+        const full = await findRequestByIdOrCode(item.id);
+        return res.json({ request: serializeRequest(full, viewer.id) });
+      } catch (err) {
+        return next(err);
+      }
+    };
+  }
+
+  // POST /api/requests/:idOrCode/cancel — owner cancels OPEN request (FR-12, BR-10, D2)
+  router.post("/:idOrCode/cancel", requireAuth, createCloseHandler("CANCELLED"));
+
+  // POST /api/requests/:idOrCode/fulfil — owner marks OPEN request fulfilled (D2)
+  router.post("/:idOrCode/fulfil", requireAuth, createCloseHandler("FULFILLED"));
 
   return router;
 }

@@ -1313,6 +1313,32 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
+  const cancelBloodRequest = async (idOrCode) => {
+    try {
+      const res = await apiFetch(`/api/requests/${encodeURIComponent(idOrCode)}/cancel`, {
+        method: "POST",
+      });
+      showToast("Request cancelled.", "info");
+      return { request: res.request };
+    } catch (err) {
+      showToast(err.message, "warn");
+      return { error: err.message };
+    }
+  };
+
+  const fulfilBloodRequest = async (idOrCode) => {
+    try {
+      const res = await apiFetch(`/api/requests/${encodeURIComponent(idOrCode)}/fulfil`, {
+        method: "POST",
+      });
+      showToast("Request marked as fulfilled.");
+      return { request: res.request };
+    } catch (err) {
+      showToast(err.message, "warn");
+      return { error: err.message };
+    }
+  };
+
   const searchDonors = async ({ bloodGroup, city, area, radius }) => {
     try {
       const qs = new URLSearchParams();
@@ -1420,6 +1446,8 @@ function AppProvider({ children, defaultRoute }) {
         submitBloodRequest,
         respondToRequest,
         decideOnRequestResponse,
+        cancelBloodRequest,
+        fulfilBloodRequest,
         deleteAccount,
         submitSafetyReport,
         logoutUser,

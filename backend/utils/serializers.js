@@ -1,3 +1,5 @@
+const { getExpiryAt } = require("../modules/requestLifecycle");
+
 function sanitizeUser(user, { includePrivate = false } = {}) {
   if (!user) return null;
 
@@ -66,6 +68,7 @@ function serializeRequest(requestItem, viewerId = null) {
     message: requestItem.message ?? null,
     status: requestItem.status,
     closureReason: requestItem.closureReason ?? null,
+    expiresAt: requestItem.requiredDate ? getExpiryAt(requestItem.requiredDate).toISOString() : null,
     createdAt: requestItem.createdAt,
     updatedAt: requestItem.updatedAt,
     requester: requestItem.requester

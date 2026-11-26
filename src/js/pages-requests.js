@@ -3,6 +3,16 @@
   const { BLOOD_GROUPS, useApp } = window.LifeLink;
   const WRAP = "max-w-[1440px] mx-auto px-5 md:px-12";
 
+  function formatExpiryPkt(requiredDate) {
+    if (!requiredDate) return "";
+    const d = new Date(requiredDate);
+    const pkt = new Date(d.getTime() + 5 * 60 * 60 * 1000);
+    const yyyy = pkt.getUTCFullYear();
+    const mm = String(pkt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(pkt.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} 11:59 PM PKT`;
+  }
+
   function RequestsPage() {
     const {
       user,
@@ -12,6 +22,8 @@
       submitBloodRequest,
       respondToRequest,
       decideOnRequestResponse,
+      cancelBloodRequest,
+      fulfilBloodRequest,
     } = useApp();
 
     const [locations, setLocations] = useState([
@@ -45,6 +57,7 @@
     const [errorMsg, setErrorMsg] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [items, setItems] = useState([]);
+    const [confirmClose, setConfirmClose] = useState(null);
 
     const loadRequests = async () => {
       const list = await fetchRequests();
@@ -337,7 +350,9 @@
                           : "bg-card text-muted border border-cardtop"
                       }`}
                     >
-                      {r.status}
+                      {r.status === "CLOSED" && r.closureReason
+                        ? `${r.status} (${r.closureReason})`
+                        : r.status}
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-text">{r.hospital}</h3>
@@ -345,9 +360,62 @@
                     {r.area}, {r.city} (Radius: {r.radius} km) • Urgency: {r.urgency}
                   </p>
                   <p className="text-[12px] text-muted">
-                    Required date: {String(r.requiredDate).slice(0, 10)} • Notified donors:{" "}
+                    Expires: {formatExpiryPkt(r.requiredDate)} • Notified donors:{" "}
                     {(r.responses || []).length}
                   </p>
+
+                  {r.status === "OPEN" && (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      {confirmClose?.id === r.id ? (
+                        <div className="flex items-center gap-2 flex-wrap bg-card px-3 py-2 rounded-2xl border border-cardtop/60 text-[12px]">
+                          <span className="text-text font-medium">
+                            {confirmClose.action === "fulfil"
+                              ? "Confirm mark as fulfilled?"
+                              : "Confirm cancel this request?"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirmClose.action === "fulfil") {
+                                await fulfilBloodRequest(r.id);
+                              } else {
+                                await cancelBloodRequest(r.id);
+                              }
+                              setConfirmClose(null);
+                              await loadRequests();
+                            }}
+                            className="px-3 py-1 rounded-full bg-danger text-white font-semibold cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmClose(null)}
+                            className="px-3 py-1 rounded-full bg-cardlow text-muted border border-cardtop cursor-pointer"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmClose({ id: r.id, action: "fulfil" })}
+                            className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[12px] font-semibold hover:bg-emerald-500/30 cursor-pointer"
+                          >
+                            Mark fulfilled
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmClose({ id: r.id, action: "cancel" })}
+                            className="px-3.5 py-1.5 rounded-full bg-danger/20 text-danger text-[12px] font-semibold hover:bg-danger/30 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* Responses Table (B2) */}
                   {(r.responses || []).length > 0 && (
@@ -460,12 +528,14 @@
                             : "bg-card text-muted border border-cardtop"
                         }`}
                       >
-                        {r.status}
+                        {r.status === "CLOSED" && r.closureReason
+                          ? `${r.status} (${r.closureReason})`
+                          : r.status}
                       </span>
                     </div>
                     <h3 className="text-base font-bold text-text">{r.hospital}</h3>
                     <p className="text-[12px] text-muted">
-                      {r.area}, {r.city} • Urgency: {r.urgency} • Required: {String(r.requiredDate).slice(0, 10)}
+                      {r.area}, {r.city} • Urgency: {r.urgency} • Expires: {formatExpiryPkt(r.requiredDate)}
                     </p>
                     {r.message && <p className="text-[12px] text-text">{r.message}</p>}
 
