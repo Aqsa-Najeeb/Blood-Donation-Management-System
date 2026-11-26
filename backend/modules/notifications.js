@@ -1,3 +1,9 @@
+let notifyHook = null;
+
+function setNotifyHook(fn) {
+  notifyHook = typeof fn === "function" ? fn : null;
+}
+
 /**
  * Notification module stub for Member 3
  * @param {number} userId
@@ -5,10 +11,13 @@
  * @returns {Promise<void>}
  */
 async function notify(userId, { type, title, text, link } = {}) {
-  // No-op stub for foundation
+  if (notifyHook) {
+    await notifyHook(userId, { type, title, text, link });
+  }
   return Promise.resolve();
 }
 
 module.exports = {
   notify,
+  setNotifyHook,
 };

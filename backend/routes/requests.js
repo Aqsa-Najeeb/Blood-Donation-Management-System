@@ -285,6 +285,190 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
     }
   });
 
+  // PATCH /api/requests/:idOrCode/respond — donor sets donorResponse (B2)
+  router.patch("/:idOrCode/respond", requireAuth, async (req, res, next) => {
+    try {
+      const viewer = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!viewer || viewer.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
+      }
+
+      const item = await findRequestByIdOrCode(req.params.idOrCode);
+      if (!item) {
+        return res.status(404).json({ error: "Blood request not found." });
+      }
+
+      // Must have a RequestResponse row (was notified)
+      const responseRow = item.responses.find((r) => r.donorId === viewer.id);
+      if (!responseRow) {
+        return res.status(403).json({ error: "You were not notified for this request." });
+      }
+
+      // Request must be OPEN
+      if (item.status !== "OPEN") {
+        return res.status(409).json({ error: "This request is no longer open. Response changes are not allowed." });
+      }
+
+      const { donorResponse } = req.body || {};
+      if (!donorResponse || !["ACCEPTED", "DECLINED"].includes(String(donorResponse).trim().toUpperCase())) {
+        return res.status(400).json({ error: "donorResponse must be ACCEPTED or DECLINED." });
+      }
+      const newResponse = String(donorResponse).trim().toUpperCase();
+
+      // Build update data
+      const updateData = {
+        donorResponse: newResponse,
+        respondedAt: now(),
+      };
+
+      // If changing from ACCEPTED to DECLINED, reset requesterDecision to NONE (D3)
+      if (responseRow.donorResponse === "ACCEPTED" && newResponse === "DECLINED") {
+        updateData.requesterDecision = "NONE";
+        updateData.decidedAt = null;
+      }
+
+      const updated = await prisma.requestResponse.update({
+        where: { id: responseRow.id },
+        data: updateData,
+        include: { donor: true, request: { include: { requester: true } } },
+      });
+
+      // Notify the requester that a donor responded
+      await notify(item.requesterId, {
+        type: "DONOR_RESPONDED",
+        title: `Donor responded to ${item.code}`,
+        text: `${viewer.name} has ${newResponse.toLowerCase()} your request (willing to be contacted).`,
+        link: `/request-track?id=${item.code}`,
+      });
+
+      const full = await findRequestByIdOrCode(item.id);
+      return res.json({ request: serializeRequest(full, viewer.id) });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // PATCH /api/requests/:idOrCode/decide/:responseId — requester sets requesterDecision (B2)
+  router.patch("/:idOrCode/decide/:responseId", requireAuth, async (req, res, next) => {
+    try {
+      const viewer = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!viewer || viewer.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
+      }
+
+      const item = await findRequestByIdOrCode(req.params.idOrCode);
+      if (!item) {
+        return res.status(404).json({ error: "Blood request not found." });
+      }
+
+      // Only the requester can decide
+      if (item.requesterId !== viewer.id) {
+        return res.status(403).json({ error: "Only the requester can approve or reject donors." });
+      }
+
+      const responseId = parsePositiveInt(req.params.responseId);
+      if (!responseId) {
+        return res.status(400).json({ error: "Invalid responseId." });
+      }
+
+      const responseRow = item.responses.find((r) => r.id === responseId);
+      if (!responseRow) {
+        return res.status(404).json({ error: "Response not found for this request." });
+      }
+
+      // donorResponse must be ACCEPTED to allow requester decision (D3)
+      if (responseRow.donorResponse !== "ACCEPTED") {
+        return res.status(400).json({
+          error: "Requester decision is only allowed when the donor has accepted (donorResponse = ACCEPTED).",
+        });
+      }
+
+      const { requesterDecision } = req.body || {};
+      if (!requesterDecision || !["APPROVED", "REJECTED"].includes(String(requesterDecision).trim().toUpperCase())) {
+        return res.status(400).json({ error: "requesterDecision must be APPROVED or REJECTED." });
+      }
+      const newDecision = String(requesterDecision).trim().toUpperCase();
+
+      await prisma.requestResponse.update({
+        where: { id: responseRow.id },
+        data: {
+          requesterDecision: newDecision,
+          decidedAt: now(),
+        },
+      });
+
+      // Notify the donor about the requester's decision
+      await notify(responseRow.donorId, {
+        type: "REQUESTER_DECISION",
+        title: `Your response was ${newDecision.toLowerCase()}`,
+        text: `The requester has ${newDecision.toLowerCase()} your response to ${item.code}. ${
+          newDecision === "APPROVED"
+            ? "You are now approved — the requester's contact details are visible."
+            : "Thank you for being willing to help."
+        }`,
+        link: `/request-track?id=${item.code}`,
+      });
+
+      const full = await findRequestByIdOrCode(item.id);
+      return res.json({ request: serializeRequest(full, viewer.id) });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // GET /api/requests/:idOrCode/responses — requester sees all responses (B2, BR-24)
+  router.get("/:idOrCode/responses", requireAuth, async (req, res, next) => {
+    try {
+      const viewer = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!viewer || viewer.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
+      }
+
+      const item = await findRequestByIdOrCode(req.params.idOrCode);
+      if (!item) {
+        return res.status(404).json({ error: "Blood request not found." });
+      }
+
+      // Only the requester can see responses list
+      if (item.requesterId !== viewer.id) {
+        return res.status(403).json({ error: "Only the requester can view responses." });
+      }
+
+      // Responses stay visible after close (BR-24)
+      const responses = item.responses.map((r) => ({
+        id: r.id,
+        requestId: r.requestId,
+        donorId: r.donorId,
+        donorResponse: r.donorResponse,
+        requesterDecision: r.requesterDecision,
+        distanceKm: r.distanceKm ?? null,
+        respondedAt: r.respondedAt ?? null,
+        decidedAt: r.decidedAt ?? null,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        donor: r.donor
+          ? {
+              id: r.donor.id,
+              name: r.donor.deactivatedAt ? "Deleted user" : r.donor.name,
+              bloodGroup: r.donor.bloodGroup,
+              area: r.donor.area,
+              city: r.donor.city,
+            }
+          : undefined,
+      }));
+
+      return res.json({
+        requestId: item.id,
+        code: item.code,
+        status: item.status,
+        count: responses.length,
+        responses,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   return router;
 }
 

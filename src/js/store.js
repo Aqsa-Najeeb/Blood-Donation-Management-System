@@ -1278,6 +1278,41 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
+  const respondToRequest = async (idOrCode, donorResponse) => {
+    try {
+      const res = await apiFetch(`/api/requests/${encodeURIComponent(idOrCode)}/respond`, {
+        method: "PATCH",
+        body: JSON.stringify({ donorResponse }),
+      });
+      showToast(
+        donorResponse === "ACCEPTED"
+          ? "Marked as willing to be contacted."
+          : "Response updated to Declined."
+      );
+      return { request: res.request };
+    } catch (err) {
+      showToast(err.message, "warn");
+      return { error: err.message };
+    }
+  };
+
+  const decideOnRequestResponse = async (idOrCode, responseId, requesterDecision) => {
+    try {
+      const res = await apiFetch(
+        `/api/requests/${encodeURIComponent(idOrCode)}/decide/${responseId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ requesterDecision }),
+        }
+      );
+      showToast(`Donor ${requesterDecision.toLowerCase()}.`);
+      return { request: res.request };
+    } catch (err) {
+      showToast(err.message, "warn");
+      return { error: err.message };
+    }
+  };
+
   const searchDonors = async ({ bloodGroup, city, area, radius }) => {
     try {
       const qs = new URLSearchParams();
@@ -1383,6 +1418,8 @@ function AppProvider({ children, defaultRoute }) {
         contactDonor,
         fetchRequests,
         submitBloodRequest,
+        respondToRequest,
+        decideOnRequestResponse,
         deleteAccount,
         submitSafetyReport,
         logoutUser,

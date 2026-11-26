@@ -72,19 +72,29 @@ function serializeRequest(requestItem, viewerId = null) {
       ? sanitizeUser(requestItem.requester, { includePrivate: false })
       : undefined,
     responses: Array.isArray(requestItem.responses)
-      ? requestItem.responses.map((r) => ({
-          id: r.id,
-          requestId: r.requestId,
-          donorId: r.donorId,
-          donorResponse: r.donorResponse,
-          requesterDecision: r.requesterDecision,
-          distanceKm: r.distanceKm ?? null,
-          respondedAt: r.respondedAt ?? null,
-          decidedAt: r.decidedAt ?? null,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
-          donor: r.donor ? sanitizeUser(r.donor, { includePrivate: false }) : undefined,
-        }))
+      ? requestItem.responses
+          .filter((r) => isOwner || (viewerId !== null && r.donorId === viewerId))
+          .map((r) => ({
+            id: r.id,
+            requestId: r.requestId,
+            donorId: r.donorId,
+            donorResponse: r.donorResponse,
+            requesterDecision: r.requesterDecision,
+            distanceKm: r.distanceKm ?? null,
+            respondedAt: r.respondedAt ?? null,
+            decidedAt: r.decidedAt ?? null,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
+            donor: r.donor
+              ? {
+                  id: r.donor.id,
+                  name: r.donor.deactivatedAt ? "Deleted user" : r.donor.name,
+                  bloodGroup: r.donor.bloodGroup,
+                  city: r.donor.city,
+                  area: r.donor.area,
+                }
+              : undefined,
+          }))
       : undefined,
   };
 

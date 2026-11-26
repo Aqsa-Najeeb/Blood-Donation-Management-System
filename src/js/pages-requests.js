@@ -4,7 +4,15 @@
   const WRAP = "max-w-[1440px] mx-auto px-5 md:px-12";
 
   function RequestsPage() {
-    const { user, navigate, showToast, fetchRequests, submitBloodRequest } = useApp();
+    const {
+      user,
+      navigate,
+      showToast,
+      fetchRequests,
+      submitBloodRequest,
+      respondToRequest,
+      decideOnRequestResponse,
+    } = useApp();
 
     const [locations, setLocations] = useState([
       { city: "Lahore", area: "Model Town" },
@@ -316,7 +324,7 @@
               {myRequests.map((r) => (
                 <div
                   key={r.id}
-                  className="bg-cardlow rounded-3xl p-6 border border-cardtop/60 flex flex-col gap-2"
+                  className="bg-cardlow rounded-3xl p-6 border border-cardtop/60 flex flex-col gap-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[12px] font-bold text-primary">
@@ -337,16 +345,93 @@
                     {r.area}, {r.city} (Radius: {r.radius} km) • Urgency: {r.urgency}
                   </p>
                   <p className="text-[12px] text-muted">
-                    Required date: {String(r.requiredDate).slice(0, 10)} • Matched donors:{" "}
+                    Required date: {String(r.requiredDate).slice(0, 10)} • Notified donors:{" "}
                     {(r.responses || []).length}
                   </p>
+
+                  {/* Responses Table (B2) */}
+                  {(r.responses || []).length > 0 && (
+                    <div className="mt-2 overflow-x-auto rounded-2xl border border-cardtop/60">
+                      <table className="w-full text-left text-[12px]">
+                        <thead className="bg-card text-muted">
+                          <tr>
+                            <th className="px-3 py-2 font-semibold">Donor</th>
+                            <th className="px-3 py-2 font-semibold">Blood</th>
+                            <th className="px-3 py-2 font-semibold">Area</th>
+                            <th className="px-3 py-2 font-semibold">Response</th>
+                            <th className="px-3 py-2 font-semibold">Decision</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-cardtop/40">
+                          {r.responses.map((resp) => (
+                            <tr key={resp.id}>
+                              <td className="px-3 py-2 font-medium text-text">
+                                {resp.donor?.name || "Donor"}
+                              </td>
+                              <td className="px-3 py-2 text-muted">{resp.donor?.bloodGroup || r.bloodGroup}</td>
+                              <td className="px-3 py-2 text-muted">{resp.donor?.area || "-"}</td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                    resp.donorResponse === "ACCEPTED"
+                                      ? "bg-emerald-500/20 text-emerald-300"
+                                      : resp.donorResponse === "DECLINED"
+                                      ? "bg-danger/20 text-danger"
+                                      : "bg-card text-muted"
+                                  }`}
+                                >
+                                  {resp.donorResponse}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                {resp.donorResponse === "ACCEPTED" ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await decideOnRequestResponse(r.id, resp.id, "APPROVED");
+                                        await loadRequests();
+                                      }}
+                                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer ${
+                                        resp.requesterDecision === "APPROVED"
+                                          ? "bg-emerald-500 text-white"
+                                          : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                                      }`}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await decideOnRequestResponse(r.id, resp.id, "REJECTED");
+                                        await loadRequests();
+                                      }}
+                                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer ${
+                                        resp.requesterDecision === "REJECTED"
+                                          ? "bg-danger text-white"
+                                          : "bg-danger/20 text-danger hover:bg-danger/30"
+                                      }`}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted text-[11px]">{resp.requesterDecision}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        {/* Matching Requests (view only) */}
+        {/* Matching Requests (Donor View + B2 Responses) */}
         <section className="flex flex-col gap-4">
           <h2 className="text-xl font-bold text-text">
             Matching Requests — Same Blood Group ({user.blood})
@@ -357,32 +442,92 @@
             </div>
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
-              {matchingRequests.map((r) => (
-                <div
-                  key={r.id}
-                  className="bg-cardlow rounded-3xl p-6 border border-cardtop/60 flex flex-col gap-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12px] font-bold text-primary">
-                      {r.code} • Same blood group: {r.bloodGroup} ({r.units} unit{r.units > 1 ? "s" : ""})
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                        r.status === "OPEN"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-card text-muted border border-cardtop"
-                      }`}
-                    >
-                      {r.status}
-                    </span>
+              {matchingRequests.map((r) => {
+                const myResponse = (r.responses || []).find((resp) => resp.donorId === user.id);
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-cardlow rounded-3xl p-6 border border-cardtop/60 flex flex-col gap-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-bold text-primary">
+                        {r.code} • Same blood group: {r.bloodGroup} ({r.units} unit{r.units > 1 ? "s" : ""})
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          r.status === "OPEN"
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : "bg-card text-muted border border-cardtop"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-text">{r.hospital}</h3>
+                    <p className="text-[12px] text-muted">
+                      {r.area}, {r.city} • Urgency: {r.urgency} • Required: {String(r.requiredDate).slice(0, 10)}
+                    </p>
+                    {r.message && <p className="text-[12px] text-text">{r.message}</p>}
+
+                    {myResponse && (
+                      <div className="mt-1 pt-3 border-t border-cardtop/40 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between text-[12px]">
+                          <span className="text-muted">
+                            Your response:{" "}
+                            <strong className="text-text">{myResponse.donorResponse}</strong>
+                            {myResponse.donorResponse === "ACCEPTED" && " (willing to be contacted)"}
+                          </span>
+                          <span className="text-muted">
+                            Decision: <strong className="text-text">{myResponse.requesterDecision}</strong>
+                          </span>
+                        </div>
+
+                        {r.status === "OPEN" && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await respondToRequest(r.id, "ACCEPTED");
+                                await loadRequests();
+                              }}
+                              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold cursor-pointer ${
+                                myResponse.donorResponse === "ACCEPTED"
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-peach text-[#633e2a] hover:bg-primary"
+                              }`}
+                            >
+                              Accept (Willing to be contacted)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await respondToRequest(r.id, "DECLINED");
+                                await loadRequests();
+                              }}
+                              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold cursor-pointer ${
+                                myResponse.donorResponse === "DECLINED"
+                                  ? "bg-danger text-white"
+                                  : "bg-card text-muted border border-cardtop hover:text-text"
+                              }`}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        )}
+
+                        {myResponse.requesterDecision === "APPROVED" && r.contactPhone && (
+                          <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-[12px]">
+                            <p className="font-semibold text-emerald-300">
+                              Requester Approved — Contact Details
+                            </p>
+                            <p className="text-text mt-0.5">Phone: {r.contactPhone}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <h3 className="text-base font-bold text-text">{r.hospital}</h3>
-                  <p className="text-[12px] text-muted">
-                    {r.area}, {r.city} • Urgency: {r.urgency} • Required: {String(r.requiredDate).slice(0, 10)}
-                  </p>
-                  {r.message && <p className="text-[12px] text-text mt-1">{r.message}</p>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
