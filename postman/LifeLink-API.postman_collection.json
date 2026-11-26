@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "Life Link Blood Donation REST API",
+    "description": "Express + Prisma + MySQL REST API collection for the Life Link Blood Donation Management System.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Health Check",
+      "item": [
+        {
+          "name": "GET API & MySQL Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Authentication",
+      "item": [
+        {
+          "name": "POST Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "if (body.token) pm.environment.set('authToken', body.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Donor\",\n  \"email\": \"test.donor@lifelink.pk\",\n  \"password\": \"LifeLink@2026\",\n  \"cnic\": \"35201-7778889-1\",\n  \"phone\": \"+92 300 7778889\",\n  \"role\": \"DONOR\",\n  \"bloodGroup\": \"O+\",\n  \"city\": \"Lahore, Pakistan\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "POST Login (Seeded Donor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('JWT token returned', () => pm.expect(body.token).to.be.a('string'));",
+                  "pm.environment.set('authToken', body.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"usman.khan\",\n  \"password\": \"LifeLink@2026\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "GET Current User (/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Donors & Availability",
+      "item": [
+        {
+          "name": "GET Live Blood Availability",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/donors/availability"
+          }
+        },
+        {
+          "name": "GET Search Matched Donors (O+, <=15km)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/donors?bloodGroup=O%2B&radius=15&availableOnly=true&sort=near"
+          }
+        },
+        {
+          "name": "GET Donor Profile by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/donors/{{donorId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Blood Requests & Tracking",
+      "item": [
+        {
+          "name": "GET All Blood Requests",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/requests"
+          }
+        },
+        {
+          "name": "GET Track Request by Code",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/requests/{{requestCode}}"
+          }
+        },
+        {
+          "name": "POST Create Blood Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "if (body.request && body.request.code) pm.environment.set('requestCode', body.request.code);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bloodGroup\": \"O-\",\n  \"units\": 2,\n  \"caseCategory\": \"Scheduled Surgical Intervention\",\n  \"urgency\": \"URGENT\",\n  \"hospital\": \"Services Hospital, Ward 4B\",\n  \"city\": \"Lahore, Punjab\",\n  \"requiredBy\": \"Within 12 hours\",\n  \"notes\": \"Scheduled cardiac surgery replacement donors.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/requests"
+          }
+        },
+        {
+          "name": "PATCH Update Request Stage (1-5)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"stage\": 4\n}" },
+            "url": "{{baseUrl}}/api/requests/{{requestCode}}/stage"
+          }
+        },
+        {
+          "name": "POST Invite Selected Donors (Max 3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"donorIds\": [1, 2]\n}" },
+            "url": "{{baseUrl}}/api/requests/{{requestCode}}/invite"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Donor Incoming Alerts",
+      "item": [
+        {
+          "name": "GET Donor Alerts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/donor/alerts"
+          }
+        },
+        {
+          "name": "POST Accept Alert",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/donor/alerts/1/accept"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. In-App Encrypted Chat",
+      "item": [
+        {
+          "name": "GET Chat Threads",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/chats"
+          }
+        },
+        {
+          "name": "POST Send Chat Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Waiting at Mayo Hospital Transfusion Lab Window 3.\",\n  \"senderRole\": \"RECIPIENT\"\n}"
+            },
+            "url": "{{baseUrl}}/api/chats/{{threadId}}/messages"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Settings, Notifications & Newsletter",
+      "item": [
+        {
+          "name": "PUT Update Privacy & Profile Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"available\": true,\n  \"strictPhoneShielding\": true,\n  \"matchingRadiusKm\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/settings"
+          }
+        },
+        {
+          "name": "POST Refresh 7-Day Freshness",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/settings/freshness"
+          }
+        },
+        {
+          "name": "GET Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/notifications"
+          }
+        },
+        {
+          "name": "POST Subscribe Newsletter",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"alerts@lifelink.pk\"\n}" },
+            "url": "{{baseUrl}}/api/newsletter"
+          }
+        }
+      ]
+    }
+  ]
+}

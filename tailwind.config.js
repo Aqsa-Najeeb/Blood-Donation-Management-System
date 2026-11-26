@@ -3,9 +3,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        deep: "#1f060c",
         surface: "#250a11",
-        card: "#34161d",
         cardlow: "#2f1219",
+        card: "#34161d",
         cardhigh: "#402027",
         cardtop: "#4d2b32",
         text: "#ffd9de",
@@ -14,6 +15,7 @@ module.exports = {
         primary: "#fcc6aa",
         peach: "#deab90",
         pink: "#ffc3c8",
+        coral: "#f69ea8",
         danger: "#ffb4ab",
       },
       fontFamily: { sans: ["Plus Jakarta Sans", "sans-serif"] },

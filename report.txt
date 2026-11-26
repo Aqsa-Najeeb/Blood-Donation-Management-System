@@ -1,0 +1,145 @@
+LIFE LINK — BLOOD DONATION MANAGEMENT SYSTEM
+TECHNICAL ARCHITECTURE, STACK & VERIFICATION REPORT
+Date: 2026-11-25
+Workspace: e:\ISE\Blood-Donation-Management-System
+
+======================================================================
+1. OVERVIEW
+======================================================================
+Life Link is a full-stack web application built from the Figma design
+(INTROTOSE-UI-UX) for donor discovery, controlled blood request dispatch
+(maximum 3 concurrent donor alerts), fulfillment pipeline tracking,
+donor/recipient workspaces, private in-app coordination, and user governance.
+
+======================================================================
+2. TECHNOLOGIES USED
+======================================================================
+Runtime & Package Management:
+- Node.js (v26.13.1 observed) & npm (11.20.0 observed)
+
+Frontend Technologies:
+- React 18.3.1 (loaded via UMD scripts in src/index.html and src/find-donors.html)
+  - Uses React Context API (createContext / useContext) and Hooks (useState, useEffect, useRef)
+- Babel Standalone 7.25.6 (@babel/standalone) for in-browser JSX compilation
+- Tailwind CSS 3.4.19 (compiled from src/input.css + tailwind.config.js into src/output.css)
+- Google Fonts: Plus Jakarta Sans (weights 400, 500, 600, 700)
+- Inline SVG & Local SVG Icons: 29 Figma SVG icons downloaded to src/assets/
+  (27 actively referenced by UI components; 0 temporary Figma URLs remain),
+  plus custom vector SVG components (LahoreMapPreview, readiness/acceptance rings)
+
+Backend / API Technologies:
+- Express 5.2.1 REST API (backend/app.js, server.js)
+- CORS 2.8.6 & dotenv 17.4.2
+- Authentication & Security:
+  - jsonwebtoken 9.0.3 (JWT Bearer token signing & verification)
+  - bcryptjs 3.0.3 (password hashing & comparison)
+- Postman Collection & Environment:
+  - postman/LifeLink-API.postman_collection.json (7 endpoint folders)
+  - postman/LifeLink-Local.postman_environment.json
+
+Database / ORM Technologies:
+- Prisma ORM 6.19.3 (prisma + @prisma/client)
+- MySQL datasource provider configured in prisma/schema.prisma via DATABASE_URL
+- Client-side fallback persistence in browser localStorage (key: "lifelink_platform_state_v2")
+  when a live MySQL instance is not connected
+
+Testing & Verification Tooling:
+- Node.js built-in test runner (node:test) + assert/strict
+- Supertest 7.2.2 (tests/api.test.js)
+- Custom smoke check script (tests/smoke.js)
+- Tailwind CLI build check (npm run build:css)
+- Live HTTP probes via Invoke-WebRequest and curl.exe
+
+======================================================================
+3. IMPLEMENTED ARCHITECTURAL LAYERS
+======================================================================
+1) Database & ORM Layer (prisma/schema.prisma, prisma/seed.js, backend/prisma.js)
+   - MySQL schema with 9 models and relational integrity:
+     users, donation_milestones, blood_requests, request_invitations,
+     chat_threads, chat_messages, notifications, safety_reports,
+     newsletter_subscribers
+   - Seed script (prisma/seed.js) for initial donors, recipient, requests,
+     invitations, milestones, chat thread/messages, and notifications
+   - Singleton PrismaClient wrapper in backend/prisma.js
+
+2) Express REST API & Auth Middleware Layer (backend/)
+   - backend/app.js: Express app wiring CORS, JSON body parsing, /api/health,
+     REST route modules, /api 404 handler, static serving for src/, and global
+     error middleware
+   - backend/middleware/auth.js: signToken, requireAuth, optionalAuth (JWT)
+   - backend/utils/serializers.js: sanitizeUser (strips passwordHash, masks
+     phone/CNIC in public listings), serializeRequest
+   - REST Route Modules:
+     - backend/routes/auth.js: /api/auth/register, /api/auth/login, /api/auth/me
+     - backend/routes/donors.js: /api/donors/availability, /api/donors, /api/donors/:id
+     - backend/routes/requests.js: /api/requests, /api/requests/:idOrCode,
+       POST /api/requests, POST /api/requests/:idOrCode/invite (3-donor cap),
+       PATCH /api/requests/:idOrCode/stage, POST /api/requests/:idOrCode/reactivate/:donorId,
+       POST /api/requests/:idOrCode/cancel, POST /api/requests/:idOrCode/rate
+     - backend/routes/donorActions.js: /api/donor/alerts,
+       /api/donor/alerts/:invitationId/accept, /decline, /advance
+     - backend/routes/chats.js: /api/chats, POST /api/chats,
+       POST /api/chats/:threadId/messages, PATCH /api/chats/:threadId/archive
+     - backend/routes/settings.js: /api/settings, /api/settings/freshness,
+       /api/settings/password, DELETE /api/settings/account,
+       /api/notifications, /api/notifications/read, /api/reports (3-report
+       auto-restriction), /api/newsletter
+
+3) Frontend State, Routing & API Sync Layer (src/js/store.js, src/js/main.js)
+   - Hash-based client router supporting 14 screens:
+     "/", "/find-donors", "/request-blood", "/donor-dashboard",
+     "/recipient-dashboard", "/donor-profile", "/request-track", "/chat",
+     "/how-it-works", "/about", "/safety-faqs", "/privacy-settings",
+     "/login", "/signup"
+   - Probes /api/health on startup; hydrates and syncs via fetch('/api/...')
+     with JWT Bearer auth when MySQL is connected, with localStorage fallback
+     when MySQL is offline
+
+4) Presentation / UI Component Layer
+   - Shared UI (src/js/components.js): Header, Footer, LahoreMapPreview,
+     ToastBanner, GlobalModal
+   - Public Pages (src/js/pages-public.js): HomePage, AboutPage,
+     HowItWorksPage, SafetyFaqsPage
+   - Matching & Tracking Pages (src/js/pages-matching.js): FindDonorsPage,
+     CreateRequestPage, RequestTrackPage
+   - Workspace & Profile Pages (src/js/pages-dashboards.js): DonorDashboardPage,
+     RecipientDashboardPage, DonorProfilePage
+   - Messaging, Settings & Auth Pages (src/js/pages-account.js): ChatPage,
+     PrivacySettingsPage, LoginPage, SignupPage
+
+5) Entry & Styling Layer (src/index.html, src/find-donors.html, src/input.css, src/output.css)
+   - Compiled Tailwind CSS bundle with custom Life Link color tokens and Plus Jakarta Sans
+
+======================================================================
+4. TESTS & VERIFICATION RUN
+======================================================================
+1) Prisma Schema Validation & Client Generation
+   - Commands: npx prisma validate; npx prisma generate
+   - Result: PASSED (schema valid; generated Prisma Client v6.19.3)
+
+2) Tailwind CSS Build (npm run build:css)
+   - Command: npx tailwindcss -i ./src/input.css -o ./src/output.css
+   - Result: PASSED (built in 938ms; src/output.css 47,749 bytes)
+
+3) Automated Smoke Test Suite (node tests/smoke.js)
+   - Checks: 26 core frontend/backend/Prisma/Postman files, zero temporary
+     Figma asset URLs, 27 referenced local SVG assets, 14 routes, 7 Postman folders
+   - Result: PASSED ("All checks passed: 26 files, 27 SVG assets, 14 routes, 7 Postman folders.")
+
+4) Express REST API Integration Tests (node --test tests/api.test.js)
+   - Scope: 9 test cases exercising /api/health, /api/auth/register & /me,
+     /api/donors filtering & field masking, /api/donors/availability,
+     /api/requests 3-donor cap enforcement, /api/requests/:code/stage,
+     /api/donor/alerts/:id/accept & /api/chats/:threadId/messages,
+     /api/settings & /api/reports 3-report safeguard, and /api/newsletter
+   - Note: Executed against Express + Supertest with an in-memory mock
+     Prisma client because no MySQL server is running on localhost:3306
+   - Result: PASSED (9/9 passing, 0 failing)
+
+5) Live Server Probes (node server.js running on http://localhost:3000)
+   - GET http://localhost:3000/ -> HTTP 200 OK
+   - GET http://localhost:3000/api/health -> HTTP 503 Service Unavailable
+     ({"status":"degraded","database":"mysql-disconnected"}) confirming
+     Express is live and awaiting a running MySQL server at localhost:3306.
+   - Live MySQL migrations/seed (npm run db:migrate, npm run db:seed):
+     NOT RUN — no MySQL server or mysql/docker binary is installed on host.

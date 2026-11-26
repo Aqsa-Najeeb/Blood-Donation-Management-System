@@ -3,10 +3,43 @@
 @tailwind utilities;
 
 @layer components {
-  .btn { @apply inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-semibold text-[15px] transition; }
-  .btn-primary { @apply bg-peach text-[#633e2a] hover:bg-primary; }
-  .btn-dark { @apply bg-card text-text hover:bg-cardhigh; }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full font-semibold text-[15px] transition-all duration-200 cursor-pointer select-none;
+  }
+  .btn-primary {
+    @apply bg-peach text-[#633e2a] hover:bg-primary shadow-[0_4px_12px_rgba(222,171,144,0.25)];
+  }
+  .btn-dark {
+    @apply bg-card text-text hover:bg-cardhigh shadow-md;
+  }
+  .btn-subtle {
+    @apply bg-cardlow text-text hover:bg-card;
+  }
+  .input-pill {
+    @apply w-full h-12 px-5 rounded-full bg-surface/80 border border-cardtop/70 text-text placeholder:text-line text-[13px] outline-none focus:border-peach focus:bg-surface transition;
+  }
+  .input-box {
+    @apply w-full px-4 py-3 rounded-2xl bg-surface/80 border border-cardtop/70 text-text placeholder:text-line text-[13px] outline-none focus:border-peach focus:bg-surface transition;
+  }
 }
 
-html { scroll-behavior: smooth; }
-::-webkit-scrollbar { display: none; }
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #250a11;
+  color: #ffd9de;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1f060c;
+}
+::-webkit-scrollbar-thumb {
+  background: #4d2b32;
+  border-radius: 9999px;
+}

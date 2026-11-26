@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UrgencyLevel {
+  STANDARD
+  URGENT
+  EMERGENCY
+}
+
+enum RequestStatus {
+  ACTIVE
+  FULFILLED
+  CANCELLED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  ON_HOLD
+  DECLINED
+  DONATED
+}
+
+enum SenderRole {
+  DONOR
+  RECIPIENT
+  SYSTEM
+}
+
+enum ReportCategory {
+  FALSE_DONOR_INFO
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  SUSPICIOUS_ACTIVITY
+}
+
+model User {
+  id                   Int                 @id @default(autoincrement())
+  name                 String              @db.VarChar(120)
+  username             String              @unique @db.VarChar(80)
+  email                String              @unique @db.VarChar(160)
+  passwordHash         String              @db.VarChar(255)
+  phone                String              @db.VarChar(30)
+  isDonor              Boolean             @default(false)
+  bloodGroup           String              @db.VarChar(5)
+  city                 String              @default("Lahore") @db.VarChar(80)
+  area                 String              @default("Model Town & Surrounds") @db.VarChar(160)
+  shortArea            String              @default("Model Town") @db.VarChar(80)
+  distanceKm           Float               @default(3.5)
+  donorIdCode          String?             @unique @db.VarChar(24)
+  available            Boolean             @default(true)
+  online               Boolean             @default(true)
+  seenLabel            String              @default("Available Now") @db.VarChar(60)
+  replyLabel           String              @default("< 15 mins") @db.VarChar(40)
+  lastConfirmedAt      DateTime            @default(now())
+  strictPhoneShielding Boolean             @default(true)
+  matchingRadiusKm     Int                 @default(10)
+  safetyFlags          Int                 @default(0)
+  restrictedUntil      DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  createdRequests      BloodRequest[]      @relation("RequesterRequests")
+  invitations          RequestInvitation[] @relation("DonorInvitations")
+  donorThreads         ChatThread[]        @relation("DonorThreads")
+  recipientThreads     ChatThread[]        @relation("RecipientThreads")
+  sentMessages         ChatMessage[]
+  notifications        Notification[]
+  reportsFiled         SafetyReport[]      @relation("ReporterReports")
+  reportsReceived      SafetyReport[]      @relation("TargetReports")
+
+  @@index([bloodGroup, available])
+  @@index([city])
+  @@map("users")
+}
+
+model BloodRequest {
+  id               Int           @id @default(autoincrement())
+  code             String        @unique @db.VarChar(24)
+  requesterId      Int
+  bloodGroup       String        @db.VarChar(5)
+  units            Int           @default(1)
+  caseCategory     String        @db.VarChar(120)
+  urgency          UrgencyLevel  @default(URGENT)
+  hospital         String        @db.VarChar(160)
+  ward             String        @default("Transfusion Ward") @db.VarChar(120)
+  city             String        @default("Lahore, Punjab") @db.VarChar(100)
+  requiredBy       String        @db.VarChar(80)
+  patientName      String        @db.VarChar(120)
+  attendantName    String        @db.VarChar(120)
+  doctorName       String        @default("Duty Hematology Officer") @db.VarChar(120)
+  labId            String        @db.VarChar(40)
+  crossMatchStatus String        @default("Awaiting Donor Sample") @db.VarChar(100)
+  slipNumber       String        @db.VarChar(24)
+  stage            Int           @default(1)
+  status           RequestStatus @default(ACTIVE)
+  notes            String?       @db.Text
+  rating           Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  requester   User                @relation("RequesterRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  invitations RequestInvitation[]
+  threads     ChatThread[]
+
+  @@index([status, bloodGroup])
+  @@index([requesterId])
+  @@map("blood_requests")
+}
+
+model RequestInvitation {
+  id            Int              @id @default(autoincrement())
+  requestId     Int
+  donorId       Int
+  status        InvitationStatus @default(PENDING)
+  eta           String?          @db.VarChar(40)
+  targetTime    String?          @db.VarChar(40)
+  distanceLabel String?          @db.VarChar(40)
+  trafficNote   String?          @db.VarChar(60)
+  pulseStatus   String?          @db.VarChar(40)
+  pulseNote     String?          @db.VarChar(80)
+  reason        String?          @db.Text
+  declineReason String?          @db.VarChar(120)
+  donorStep     Int              @default(1)
+  respondedAt   String           @default("Invited just now") @db.VarChar(80)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  request BloodRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  donor   User         @relation("DonorInvitations", fields: [donorId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, donorId])
+  @@index([donorId, status])
+  @@map("request_invitations")
+}
+
+model ChatThread {
+  id          Int      @id @default(autoincrement())
+  requestId   Int
+  donorId     Int
+  recipientId Int
+  hospital    String   @db.VarChar(160)
+  statusTag   String   @default("Relay") @db.VarChar(60)
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  request   BloodRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  donor     User          @relation("DonorThreads", fields: [donorId], references: [id], onDelete: Cascade)
+  recipient User          @relation("RecipientThreads", fields: [recipientId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@unique([requestId, donorId])
+  @@index([recipientId])
+  @@index([donorId])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id         Int        @id @default(autoincrement())
+  threadId   Int
+  senderId   Int?
+  senderRole SenderRole
+  text       String     @db.Text
+  delivered  Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User?      @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  title       String   @db.VarChar(160)
+  description String   @db.VarChar(255)
+  route       String   @default("/donor-dashboard") @db.VarChar(80)
+  unread      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, unread])
+  @@map("notifications")
+}
+
+model SafetyReport {
+  id           Int            @id @default(autoincrement())
+  targetUserId Int
+  reporterId   Int
+  category     ReportCategory @default(SUSPICIOUS_ACTIVITY)
+  reason       String         @db.Text
+  evidence     String?        @db.Text
+  createdAt    DateTime       @default(now())
+
+  targetUser User @relation("TargetReports", fields: [targetUserId], references: [id], onDelete: Cascade)
+  reporter   User @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([targetUserId, reporterId])
+  @@index([targetUserId])
+  @@map("safety_reports")
+}

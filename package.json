@@ -1,16 +1,46 @@
 {
-  "name": "tailwind-project",
+  "name": "blood-donation-management-system",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Life Link — Direct Verified Blood Exchange (Express REST API + Prisma + MySQL)",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css",
+    "watch:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css --watch",
+    "start": "node server.js",
+    "db:generate": "npx prisma generate",
+    "db:migrate": "npx prisma migrate dev --name init",
+    "db:push": "npx prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "npx prisma studio",
+    "test": "node tests/smoke.js",
+    "test:api": "node --test tests/api.test.js",
+    "test:all": "node tests/smoke.js && node --test tests/a1.test.js"
   },
-  "keywords": [],
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "keywords": [
+    "blood-donation",
+    "healthcare",
+    "lifelink",
+    "express",
+    "prisma",
+    "mysql"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  },
   "devDependencies": {
+    "prisma": "6.19.3",
+    "supertest": "^7.2.2",
     "tailwindcss": "^3.4.19"
   }
 }

@@ -1,0 +1,16 @@
+# LIFE LINK — Open Issues and Consistency
+
+Status updated on 26 Nov 2026 based on decisions D1–D9 and stack decision ADR-11. Items marked **[RESOLVED - 26 Nov 2026]** are resolved by the 26 Nov 2026 decisions pending final group sign-off.
+
+1. **Reporting safeguard:** **[RESOLVED - 26 Nov 2026 via D7]** Defined independent reporter as distinct account, one report per reporter per target, reporter account older than 24 hours, and no self-report. Reports submitted prior to the start of the last restriction period do not count again. Precautionary 7-day restriction on creating new emergency requests is triggered at 3 independent reports.
+2. **Prior alternative:** **[RESOLVED - 26 Nov 2026 via Session Record]** Group confirmed the precautionary 7-day restriction on creating emergency requests over the earlier recording-only proposal.
+3. **Request statuses:** **[RESOLVED - 26 Nov 2026 via D2]** Resolved as `status = Open | Closed` with `closureReason = FULFILLED | CANCELLED | EXPIRED`. Expiry occurs at 11:59 PM PKT (UTC+5) on the required date, verified on every read and via a 60-second background sweep.
+4. **Donor response lifecycle:** **[RESOLVED - 26 Nov 2026 via D3]** Resolved using two separate fields: Donor response (`Pending | Accepted | Declined`, changeable while Open) and Requester decision (`None | Approved | Rejected`, allowed only on Accepted responses). No separate Withdrawn state needed.
+5. **Multiple accepted donors:** **[RESOLVED - 26 Nov 2026 via D3]** Requester may Approve multiple Accepted donors. No automatic closure occurs on first acceptance; requester manually closes the request as FULFILLED, CANCELLED, or allows it to expire.
+6. **Chat grouping:** **[RESOLVED - 26 Nov 2026 via D5]** General platform chat is structured as one conversation per user pair, managed via mutual invitations (Accept, Reject, Restrict). Request-linked read-only restrictions from old FR-13 are decoupled.
+7. **Notifications:** **[RESOLVED - 26 Nov 2026 via D9]** In-app notification delivery model clarified: client polls every 15 seconds; alerts are transient/unpersisted in history page.
+8. **Account deletion:** **[RESOLVED - 26 Nov 2026 via D8]** Resolved as deactivation with anonymization of personally identifiable information (name, email, phone). Historical messages and safety reports remain intact attributed to "Deleted user".
+9. **Blood group:** User-editable and unverified; UI must not imply medical verification. (Confirmed baseline; prototype audit conducted to remove "Verified" labels).
+10. **Original document reconciliation:** Admin flows removed; update PRD/architecture/ASRs/ADR/README consistently. This package does so through explicit amendments while retaining historical context.
+11. **Implementation status:** **[RESOLVED - 26 Nov 2026 via ADR-11]** Stack formally approved (Express + Prisma + MySQL + React via UMD/Babel). Existing prototype identified in codebase; task shifts from greenfield implementation to aligning and completing prototype.
+12. **D4 evidence:** AI workflow logs, slice-by-slice human decisions, test output, deployment proof and group contribution details must come from actual project work, not retrospective invention. (Evidence log initialized empty; no fabrication).
