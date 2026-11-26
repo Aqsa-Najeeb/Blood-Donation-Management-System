@@ -239,7 +239,10 @@ describe("Slice A2 — Account deletion & anonymisation (D8)", () => {
       .send({ available: true });
 
     // Confirm target is in search before deletion
-    const searchBefore = await request(app).get("/api/donors");
+    const searchBefore = await request(app)
+      .get("/api/donors")
+      .set("Authorization", `Bearer ${reporter.token}`);
+    assert.equal(searchBefore.status, 200);
     assert.ok(searchBefore.body.donors.some((d) => d.id === target.user.id));
 
     // Create a safety report referencing target
@@ -277,10 +280,15 @@ describe("Slice A2 — Account deletion & anonymisation (D8)", () => {
     assert.equal(loginRes.status, 401);
 
     // Excluded from search and donor detail
-    const searchAfter = await request(app).get("/api/donors");
+    const searchAfter = await request(app)
+      .get("/api/donors")
+      .set("Authorization", `Bearer ${reporter.token}`);
+    assert.equal(searchAfter.status, 200);
     assert.ok(!searchAfter.body.donors.some((d) => d.id === target.user.id));
 
-    const detailAfter = await request(app).get(`/api/donors/${target.user.id}`);
+    const detailAfter = await request(app)
+      .get(`/api/donors/${target.user.id}`)
+      .set("Authorization", `Bearer ${reporter.token}`);
     assert.equal(detailAfter.status, 404);
 
     // Report remains and linked target user shows 'Deleted user'

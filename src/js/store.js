@@ -1256,6 +1256,29 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
+  const searchDonors = async ({ bloodGroup, city, area, radius }) => {
+    try {
+      const qs = new URLSearchParams();
+      if (bloodGroup) qs.set("bloodGroup", bloodGroup);
+      if (city) qs.set("city", city);
+      if (area) qs.set("area", area);
+      if (radius) qs.set("radius", radius);
+      return await apiFetch(`/api/donors?${qs.toString()}`);
+    } catch (err) {
+      showToast(err.message, "warn");
+      return null;
+    }
+  };
+
+  const contactDonor = async (donorId) => {
+    try {
+      return await apiFetch(`/api/donors/${donorId}/contact`, { method: "POST" });
+    } catch (err) {
+      showToast(err.message, "warn");
+      return null;
+    }
+  };
+
   const deleteAccount = async () => {
     try {
       await apiFetch("/api/settings/account", { method: "DELETE" });
@@ -1334,6 +1357,8 @@ function AppProvider({ children, defaultRoute }) {
         saveProfile,
         enableDonorMode,
         toggleDonorAvailability,
+        searchDonors,
+        contactDonor,
         deleteAccount,
         submitSafetyReport,
         logoutUser,

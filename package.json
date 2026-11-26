@@ -14,7 +14,7 @@
     "db:studio": "npx prisma studio",
     "test": "node tests/smoke.js",
     "test:api": "node --test tests/api.test.js",
-    "test:all": "node tests/smoke.js && node --test tests/a1.test.js tests/a2.test.js"
+    "test:all": "node tests/smoke.js && node --test --test-concurrency=1 tests/a1.test.js tests/a2.test.js tests/a3.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

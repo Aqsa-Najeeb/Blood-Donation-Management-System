@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { signToken, requireAuth } = require("../middleware/auth");
 const { sanitizeUser } = require("../utils/serializers");
@@ -120,7 +121,7 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
           city: cleanCity,
           area: cleanArea,
           shortArea: cleanCity.split(",")[0].trim() || "Lahore",
-          donorIdCode: `#LL-${Math.floor(1000 + Math.random() * 8999)}`,
+          donorIdCode: `#LL-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
           available: false,
           online: true,
           seenLabel: "Available Now",

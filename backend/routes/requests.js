@@ -154,7 +154,7 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
           seenLabel: { not: "Deactivated" },
           id: { not: requester.id },
         },
-        orderBy: { distanceKm: "asc" },
+        orderBy: { id: "asc" },
         take: MAX_CONCURRENT_DONORS,
       });
 
@@ -182,9 +182,9 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
             create: matchingDonors.map((d, idx) => ({
               donorId: d.id,
               status: idx === 0 ? "PENDING" : "ON_HOLD",
-              eta: `~${Math.round(d.distanceKm * 4 + 8)} Mins`,
+              eta: "~20 Mins",
               targetTime: "Pending",
-              distanceLabel: `${d.distanceKm} km away`,
+              distanceLabel: "Nearby",
               trafficNote: "Normal traffic",
               pulseStatus: "Alert Pushed",
               pulseNote: "Controlled 3-donor cap",
@@ -253,9 +253,9 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
             requestId: target.id,
             donorId: d.id,
             status: "PENDING",
-            eta: `~${Math.max(12, Math.round(d.distanceKm * 4))} Mins`,
+            eta: "~20 Mins",
             targetTime: "In 25 mins",
-            distanceLabel: `${d.distanceKm} km away`,
+            distanceLabel: "Nearby",
             trafficNote: "Moderate traffic",
             pulseStatus: "Ping Sent",
             pulseNote: "Awaiting confirmation",

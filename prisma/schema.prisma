@@ -52,7 +52,6 @@ model User {
   city                 String              @default("Lahore") @db.VarChar(80)
   area                 String              @default("Model Town & Surrounds") @db.VarChar(160)
   shortArea            String              @default("Model Town") @db.VarChar(80)
-  distanceKm           Float               @default(3.5)
   donorIdCode          String?             @unique @db.VarChar(24)
   available            Boolean             @default(false)
   online               Boolean             @default(true)

@@ -32,7 +32,6 @@ async function createTestUser(prisma, overrides = {}) {
     city: "Lahore",
     area: "Model Town",
     shortArea: "Model Town",
-    distanceKm: 5.0,
     donorIdCode: `#LL-${Math.floor(1000 + Math.random() * 8999)}`,
     available: false,
     online: true,

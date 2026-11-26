@@ -16,7 +16,6 @@ function sanitizeUser(user, { includePrivate = false } = {}) {
     online: user.online,
     seenLabel: user.seenLabel,
     replyLabel: user.replyLabel,
-    distanceKm: user.distanceKm,
     donorIdCode: user.donorIdCode,
     matchingRadiusKm: user.matchingRadiusKm,
     safetyFlags: user.safetyFlags,
@@ -60,8 +59,26 @@ function serializeRequest(requestItem) {
   };
 }
 
+function serializeSearchDonor(user, { distance, freshness, isOutdated }) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    bloodGroup: user.bloodGroup,
+    city: user.city,
+    area: user.area,
+    available: Boolean(user.available),
+    availabilityLabel: user.available ? "Available" : "Unavailable",
+    distance,
+    lastAvailabilityUpdate: user.lastAvailabilityUpdate || null,
+    freshness,
+    isOutdated: Boolean(isOutdated),
+  };
+}
+
 module.exports = {
   sanitizeUser,
+  serializeSearchDonor,
   maskPhone,
   serializeRequest,
 };
