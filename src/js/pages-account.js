@@ -140,7 +140,7 @@ window.LifeLinkAccountPages = (() => {
     return (
       <div className={`${WRAP} py-6 flex flex-col gap-4`}>
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-bold text-text">ðŸ’¬ Chats</h1>
+          <h1 className="text-2xl font-bold text-text">💬 Chats</h1>
           <div className="text-[12px] text-muted">Pair-based messaging</div>
         </div>
 
@@ -181,11 +181,11 @@ window.LifeLinkAccountPages = (() => {
                     </div>
                     <div className="min-w-0">
                       <div className="text-[13px] font-bold text-text truncate">{c.partner?.name || "User"}</div>
-                      <div className="text-[10px] text-primary">{c.partner?.bloodGroup || ""} â€¢ {c.partner?.area || ""}</div>
+                      <div className="text-[10px] text-primary">{c.partner?.bloodGroup || ""} • {c.partner?.area || ""}</div>
                     </div>
                   </div>
-                  {restricted && <span className="text-[10px] text-danger mt-1 inline-block">ðŸš« Restricted</span>}
-                  {c.requiresReinvite && !restricted && <span className="text-[10px] text-amber-400 mt-1 inline-block">âš  Reinvite needed</span>}
+                  {restricted && <span className="text-[10px] text-danger mt-1 inline-block">🚫 Restricted</span>}
+                  {c.requiresReinvite && !restricted && <span className="text-[10px] text-amber-400 mt-1 inline-block">⚠ Reinvite needed</span>}
                 </button>
               );
             })}
@@ -235,7 +235,7 @@ window.LifeLinkAccountPages = (() => {
                     </div>
                     <div>
                       <h1 className="text-[15px] font-bold text-text">{activeConv.partner?.name}</h1>
-                      <div className="text-[11px] text-muted">{activeConv.partner?.bloodGroup} â€¢ {activeConv.partner?.area}</div>
+                      <div className="text-[11px] text-muted">{activeConv.partner?.bloodGroup} • {activeConv.partner?.area}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ window.LifeLinkAccountPages = (() => {
                       }
                       className="px-2.5 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] text-muted cursor-pointer"
                     >
-                      âš‘ Report
+                      ⚑ Report
                     </button>
                     {activeConv.restrictedById === user.id && (
                       <button onClick={() => handleRestrict(activeConv.id, "remove")} className="px-3 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-amber-400 cursor-pointer">Remove Restriction</button>
@@ -280,8 +280,8 @@ window.LifeLinkAccountPages = (() => {
                 {(activeConv.restrictedById || activeConv.requiresReinvite) && (
                   <div className="mx-4 mt-3 p-3 rounded-2xl bg-danger/10 border border-danger/30 text-[12px] text-danger">
                     {activeConv.restrictedById
-                      ? "ðŸš« This conversation is restricted. Messages and invitations are blocked."
-                      : "âš  Restriction was removed. A new chat invitation must be accepted before messaging can resume."}
+                      ? "🚫 This conversation is restricted. Messages and invitations are blocked."
+                      : "⚠ Restriction was removed. A new chat invitation must be accepted before messaging can resume."}
                   </div>
                 )}
                 <div ref={feedRef} className="flex-1 p-4 md:px-6 overflow-y-auto flex flex-col gap-3 max-h-[400px]">
@@ -291,7 +291,7 @@ window.LifeLinkAccountPages = (() => {
                     return (
                       <div key={m.id} className={`flex flex-col ${outgoing ? "items-end" : "items-start"}`}>
                         <div className="text-[10px] text-line mb-1">
-                          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} â€¢ {m.senderName || "You"}
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {m.senderName || "You"}
                         </div>
                         <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
                           outgoing ? "bg-peach text-[#3b1f12] font-medium rounded-br-sm" : "bg-card text-text border border-cardtop/50 rounded-bl-sm"
@@ -306,7 +306,7 @@ window.LifeLinkAccountPages = (() => {
                   <form onSubmit={handleSend} className="p-4 border-t border-cardtop/50 flex items-center gap-2 bg-card/40">
                     <input type="text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Message ${activeConv.partner?.name || "partner"}... (max 1000 chars)`} maxLength={1000} className="input-pill flex-1 h-11" />
                     <span className="text-[10px] text-line shrink-0">{draft.length}/1000</span>
-                    <button type="submit" className="btn btn-primary py-2.5 px-5 text-[13px]">Send âž¤</button>
+                    <button type="submit" className="btn btn-primary py-2.5 px-5 text-[13px]">Send ➤</button>
                   </form>
                 )}
               </>
@@ -364,10 +364,10 @@ window.LifeLinkAccountPages = (() => {
           <aside className="lg:col-span-3 flex flex-col gap-4 lg:sticky lg:top-24">
             <div className="bg-cardlow rounded-3xl p-3 border border-cardtop/50 flex flex-col gap-1">
               {[
-                { id: "profile", label: "ðŸ‘¤ Profile & Blood Group" },
-                { id: "availability", label: "âš¡ Donor Availability" },
-                { id: "privacy", label: "ðŸ›¡ Privacy & Safety" },
-                { id: "security", label: "ðŸ”‘ Account Security" },
+                { id: "profile", label: "👤 Profile & Blood Group" },
+                { id: "availability", label: "⚡ Donor Availability" },
+                { id: "privacy", label: "🛡 Privacy & Safety" },
+                { id: "security", label: "🔑 Account Security" },
               ].map((nav) => (
                 <button
                   key={nav.id}
@@ -387,7 +387,7 @@ window.LifeLinkAccountPages = (() => {
 
             <div className="bg-cardlow rounded-3xl p-5 border border-cardtop/50">
               <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                âœ” DONOR CREDIBILITY
+                ✔ DONOR CREDIBILITY
               </div>
               <p className="text-[12px] text-muted mt-2">
                 {form.safetyFlags} flags reported across historical donor inquiries in the {form.city} region.
@@ -485,7 +485,7 @@ window.LifeLinkAccountPages = (() => {
                   <h2 className="text-xl font-bold text-text">Donor Availability Controls</h2>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold">
-                  â— Status: {form.available ? "Fresh (Active within 7 days)" : "Paused"}
+                  ● Status: {form.available ? "Fresh (Active within 7 days)" : "Paused"}
                 </span>
               </div>
 
@@ -510,7 +510,7 @@ window.LifeLinkAccountPages = (() => {
 
               <div className="bg-deep rounded-2xl p-4 border border-cardtop/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-[12px] text-muted">
-                  <strong className="text-text">7-Day Freshness Assurance Rule:</strong> Profiles inactive for &gt;7 days display as â€œMay be outdatedâ€.
+                  <strong className="text-text">7-Day Freshness Assurance Rule:</strong> Profiles inactive for &gt;7 days display as “May be outdated”.
                 </div>
                 <button
                   onClick={() => {
@@ -519,7 +519,7 @@ window.LifeLinkAccountPages = (() => {
                   }}
                   className="px-4 py-2 rounded-full bg-card hover:bg-cardhigh text-primary text-[12px] font-semibold shrink-0 cursor-pointer"
                 >
-                  â†» Refresh Timestamp Now
+                  ↻ Refresh Timestamp Now
                 </button>
               </div>
             </section>
@@ -618,7 +618,7 @@ window.LifeLinkAccountPages = (() => {
 
               <div className="bg-danger/10 border border-danger/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="font-bold text-danger text-[14px]">âš  Permanent Account Deletion</div>
+                  <div className="font-bold text-danger text-[14px]">⚠ Permanent Account Deletion</div>
                   <p className="text-[12px] text-muted mt-1">
                     Deleting your account unpublishes your blood record immediately. Anonymized safety logs remain archived for 30 days.
                   </p>
@@ -645,13 +645,13 @@ window.LifeLinkAccountPages = (() => {
         {/* Sticky Action Footer Bar */}
         <div className="fixed bottom-5 inset-x-0 z-40 px-5 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto bg-cardhigh/95 backdrop-blur-xl rounded-full px-6 py-3 shadow-2xl border border-cardtop flex items-center justify-between gap-4">
-            <span className="text-[12px] text-muted">â— Settings synced with secure cloud.</span>
+            <span className="text-[12px] text-muted">● Settings synced with secure cloud.</span>
             <div className="flex items-center gap-3">
               <button onClick={discardChanges} className="text-[13px] text-muted hover:text-text cursor-pointer">
                 Discard
               </button>
               <button onClick={saveChanges} className="btn btn-primary py-2 px-6 text-[13px]">
-                âœ” Save Changes
+                ✔ Save Changes
               </button>
             </div>
           </div>
@@ -684,7 +684,7 @@ window.LifeLinkAccountPages = (() => {
             aria-label="Back to Home"
             className="hidden sm:flex absolute -left-14 top-6 w-10 h-10 rounded-full bg-cardlow border border-cardtop items-center justify-center text-muted hover:text-text cursor-pointer"
           >
-            â†
+            ←
           </button>
 
           <div className="bg-cardlow rounded-[32px] p-8 md:p-10 border border-cardtop/60 shadow-2xl flex flex-col gap-6">
@@ -760,7 +760,7 @@ window.LifeLinkAccountPages = (() => {
             )}
 
             <p className="text-center text-[13px] text-muted">
-              Donâ€™t have an account?{" "}
+              Don’t have an account?{" "}
               <button
                 onClick={() => navigate("/signup")}
                 className="text-primary font-semibold hover:underline cursor-pointer"
@@ -808,7 +808,7 @@ window.LifeLinkAccountPages = (() => {
             aria-label="Back to Home"
             className="hidden sm:flex absolute -left-14 top-6 w-10 h-10 rounded-full bg-cardlow border border-cardtop items-center justify-center text-muted hover:text-text cursor-pointer"
           >
-            â†
+            ←
           </button>
 
           <div className="bg-cardlow rounded-[32px] p-8 md:p-10 border border-cardtop/60 shadow-2xl flex flex-col gap-5">
@@ -830,7 +830,7 @@ window.LifeLinkAccountPages = (() => {
                         : "bg-card border-cardtop text-muted"
                     }`}
                   >
-                    ðŸ¤ Voluntary Donor
+                    🤍 Voluntary Donor
                   </button>
                   <button
                     type="button"
@@ -841,7 +841,7 @@ window.LifeLinkAccountPages = (() => {
                         : "bg-card border-cardtop text-muted"
                     }`}
                   >
-                    ðŸ‘¤ Recipient / Patient
+                    👤 Recipient / Patient
                   </button>
                 </div>
               </div>
@@ -916,7 +916,7 @@ window.LifeLinkAccountPages = (() => {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     className="input-pill"
                   />
                 </div>
@@ -926,7 +926,7 @@ window.LifeLinkAccountPages = (() => {
                     type="password"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     className="input-pill"
                   />
                 </div>
