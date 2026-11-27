@@ -26,7 +26,6 @@ function validSignup(overrides = {}) {
     city: "Lahore",
     area: "Model Town",
     dateOfBirth: "1998-06-15",
-    ageConfirmed: true,
     agreementAccepted: true,
     ...overrides,
   };
@@ -56,26 +55,18 @@ describe("User Agreement, Age Verification & Policies", () => {
     assert.match(res.body.error, /agreement/i);
   });
 
-  it("rejects signup without confirming minimum age", async () => {
-    const res = await request(app)
-      .post("/api/auth/register")
-      .send(validSignup({ ageConfirmed: false }));
-    assert.equal(res.status, 400);
-    assert.match(res.body.error, /minimum age/i);
-  });
-
-  it("rejects signup below minimum age (BVA: 17y364d rejected, 18y0d accepted)", async () => {
-    // At 2026-11-27: 2008-11-28 is 17y 364d -> rejected
+  it("calculates age automatically from dateOfBirth and refuses access below 18 (BVA: 17y364d rejected, 18y0d accepted)", async () => {
+    // At 2026-11-27: 2008-11-28 is 17y 364d -> rejected without needing an ageConfirmed checkbox
     const tooYoung = await request(app)
       .post("/api/auth/register")
-      .send(validSignup({ dateOfBirth: "2008-11-28" }));
+      .send(validSignup({ dateOfBirth: "2008-11-28", ageConfirmed: undefined }));
     assert.equal(tooYoung.status, 400);
     assert.match(tooYoung.body.error, new RegExp(String(MIN_AGE_YEARS)));
 
-    // 2008-11-27 is exactly 18y 0d -> accepted
+    // 2008-11-27 is exactly 18y 0d -> accepted automatically
     const exactMin = await request(app)
       .post("/api/auth/register")
-      .send(validSignup({ dateOfBirth: "2008-11-27" }));
+      .send(validSignup({ dateOfBirth: "2008-11-27", ageConfirmed: undefined }));
     assert.equal(exactMin.status, 201);
     assert.equal(exactMin.body.user.agreementAccepted, true);
     assert.equal(exactMin.body.user.agreementVersion, CURRENT_AGREEMENT_VERSION);
@@ -177,7 +168,7 @@ describe("User Agreement, Age Verification & Policies", () => {
       assert.ok(componentsJs.includes(r), `Missing footer link: ${r}`);
     }
 
-    assert.ok(accountJs.includes("ageConfirmed"));
+    assert.ok(!accountJs.includes("ageConfirmed"));
     assert.ok(accountJs.includes("agreementAccepted"));
     assert.ok(accountJs.includes('type="date"'));
     assert.ok(accountJs.includes("LIFE LINK User Agreement"));

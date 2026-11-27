@@ -66,7 +66,6 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
         city,
         area,
         dateOfBirth,
-        ageConfirmed,
         agreementAccepted,
       } = req.body || {};
 
@@ -81,12 +80,6 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
         });
       }
 
-      if (ageConfirmed !== true) {
-        return res.status(400).json({
-          error: `You must confirm that you meet the minimum age requirement (${MIN_AGE_YEARS}+).`,
-        });
-      }
-
       const currentNow = now();
       const dobCheck = parseDateOfBirth(dateOfBirth, currentNow);
       if (dobCheck.error) {
@@ -94,7 +87,7 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
       }
       if (dobCheck.ageYears < MIN_AGE_YEARS) {
         return res.status(400).json({
-          error: `You must be at least ${MIN_AGE_YEARS} years old to register on LIFE LINK.`,
+          error: `Access refused: you must be at least ${MIN_AGE_YEARS} years old to register on LIFE LINK.`,
         });
       }
 
@@ -200,7 +193,7 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
       const { identifier, username, email, password } = req.body || {};
       const cleanId = String(identifier || username || email || "").trim().toLowerCase();
       if (!cleanId || !password) {
-        return res.status(400).json({ error: "Username/email and password are required." });
+        return res.status(400).json({ error: "Username and password are required." });
       }
       if (isDemoEmail(cleanId)) {
         return res.status(401).json({ error: "Demo accounts cannot authenticate against real database accounts." });

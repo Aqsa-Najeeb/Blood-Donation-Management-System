@@ -1210,7 +1210,6 @@ function AppProvider({ children, defaultRoute }) {
           city: form.city,
           area: form.area,
           dateOfBirth: form.dateOfBirth,
-          ageConfirmed: Boolean(form.ageConfirmed),
           agreementAccepted: Boolean(form.agreementAccepted),
         }),
       });

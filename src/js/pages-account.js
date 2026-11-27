@@ -713,12 +713,12 @@ window.LifeLinkAccountPages = (() => {
 
             <form onSubmit={submit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-[12px] font-semibold text-text mb-1.5">Username or Email</label>
+                <label className="block text-[12px] font-semibold text-text mb-1.5">Username</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username or email"
+                  placeholder="Enter your username"
                   className="input-pill"
                 />
               </div>
@@ -801,8 +801,21 @@ window.LifeLinkAccountPages = (() => {
     const [area, setArea] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
-    const [ageConfirmed, setAgeConfirmed] = useState(false);
     const [agreementAccepted, setAgreementAccepted] = useState(false);
+
+    const calculateAge = (dobStr) => {
+      if (!dobStr) return null;
+      const dob = new Date(dobStr);
+      if (isNaN(dob.getTime())) return null;
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      return age;
+    };
+    const calculatedAge = calculateAge(dateOfBirth);
 
     const submit = (e) => {
       e.preventDefault();
@@ -810,8 +823,9 @@ window.LifeLinkAccountPages = (() => {
         showToast("Please fill in your full name, username, phone, date of birth, area, and blood group.", "warn");
         return;
       }
-      if (!ageConfirmed) {
-        showToast(`Please confirm that you meet the minimum age requirement (${minAge}+).`, "warn");
+      const age = calculateAge(dateOfBirth);
+      if (age === null || age < (minAge || 18)) {
+        showToast(`Access refused: you must be at least ${minAge || 18} years old to register.`, "warn");
         return;
       }
       if (!agreementAccepted) {
@@ -827,7 +841,6 @@ window.LifeLinkAccountPages = (() => {
         username,
         phone,
         dateOfBirth,
-        ageConfirmed,
         agreementAccepted,
         blood,
         city,
@@ -924,7 +937,14 @@ window.LifeLinkAccountPages = (() => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-text mb-1">Date of Birth</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[12px] font-semibold text-text">Date of Birth</label>
+                    {calculatedAge !== null && (
+                      <span className={`text-[11px] font-semibold ${calculatedAge >= (minAge || 18) ? "text-emerald-400" : "text-danger"}`}>
+                        Age: {calculatedAge} {calculatedAge >= (minAge || 18) ? "✓ (Eligible)" : "✗ (< 18, Access Refused)"}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={dateOfBirth}
@@ -978,18 +998,6 @@ window.LifeLinkAccountPages = (() => {
               </div>
 
               <div className="flex flex-col gap-2.5 pt-1 text-[12px] text-muted">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                    className="mt-0.5 accent-primary cursor-pointer"
-                  />
-                  <span>
-                    I confirm that I meet the minimum age requirement ({minAge || 18}+) to use LIFE LINK.
-                  </span>
-                </label>
-
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
