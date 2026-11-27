@@ -11,6 +11,8 @@ const createChatsRouter = require("./routes/chats");
 const createSettingsRouter = require("./routes/settings");
 const { setNotificationPrisma } = require("./modules/notifications");
 const { setRestrictionPrisma } = require("./modules/restrictions");
+const { isDemoModeEnabled } = require("./config/demoMode");
+const { createDemoMiddleware } = require("./modules/demoStore");
 
 function createApp(prisma, { skipRateLimiters = false } = {}) {
   setNotificationPrisma(prisma);
@@ -108,6 +110,17 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
       });
     }
   });
+
+  // Public configuration endpoint (never exposes secrets or internal config)
+  app.get("/api/config", (_req, res) => {
+    return res.json({
+      demoMode: isDemoModeEnabled(),
+    });
+  });
+
+  // Isolated Demo Mode middleware (only active when DEMO_MODE=true and NODE_ENV!==production)
+  const { router: demoRouter } = createDemoMiddleware();
+  app.use("/api", demoRouter);
 
   // REST API Routes
   app.use("/api/auth", createAuthRouter(prisma, { authLimiter }));

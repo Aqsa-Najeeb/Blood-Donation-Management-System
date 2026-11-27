@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { isDemoModeEnabled } = require("../config/demoMode");
 
 const DEV_FALLBACK_SECRET = "lifelink-dev-secret-change-in-production";
 
@@ -16,9 +17,26 @@ function signToken(user) {
       id: user.id,
       username: user.username,
       isDonor: Boolean(user.isDonor),
+      isDemo: false,
     },
     getJwtSecret(),
     { algorithm: "HS256", expiresIn: "7d" }
+  );
+}
+
+function signDemoToken(user) {
+  if (!isDemoModeEnabled()) {
+    throw new Error("Demo Mode is disabled.");
+  }
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      isDonor: Boolean(user.isDonor),
+      isDemo: true,
+    },
+    getJwtSecret(),
+    { algorithm: "HS256", expiresIn: "12h" }
   );
 }
 
@@ -35,6 +53,9 @@ function verifyToken(token) {
   const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] });
   if (!decoded || !Number.isInteger(decoded.id) || decoded.id <= 0) {
     throw new Error("Malformed token payload");
+  }
+  if (decoded.isDemo === true && !isDemoModeEnabled()) {
+    throw new Error("Demo token rejected when Demo Mode is disabled");
   }
   return decoded;
 }
@@ -79,6 +100,7 @@ function requireRole(...allowedRoles) {
 
 module.exports = {
   signToken,
+  signDemoToken,
   requireAuth,
   optionalAuth,
   requireRole,

@@ -653,6 +653,8 @@ function AppProvider({ children, defaultRoute }) {
   });
 
   const [apiConnected, setApiConnected] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [serviceUnavailable, setServiceUnavailable] = useState(false);
   const [user, setUser] = useState(saved?.user || INITIAL_USER);
   const [donors, setDonors] = useState(saved?.donors || INITIAL_DONORS);
   const [requests, setRequests] = useState(saved?.requests || INITIAL_REQUESTS);
@@ -671,6 +673,17 @@ function AppProvider({ children, defaultRoute }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      try {
+        const cfg = await apiFetch("/api/config");
+        if (!active) return;
+        setDemoMode(Boolean(cfg?.demoMode));
+      } catch {
+        if (!active) return;
+        setServiceUnavailable(true);
+        setApiConnected(false);
+        return;
+      }
+
       try {
         const health = await apiFetch("/api/health");
         if (!active || health.database !== "mysql-connected") return;
@@ -702,7 +715,7 @@ function AppProvider({ children, defaultRoute }) {
           }
         }
       } catch {
-        // Fallback smoothly to local seeded state when MySQL is offline
+        // Health or DB check failed; do not fall back to simulated auth
       }
     })();
     return () => {
@@ -1056,95 +1069,128 @@ function AppProvider({ children, defaultRoute }) {
     navigate("/donor-profile", { id: String(donorId) });
   };
 
-  const loginUser = async ({ username, password, role }) => {
-    if (apiConnected) {
-      if (!password) {
-        showToast("Please enter your password to sign in.", "warn");
-        return false;
-      }
-      try {
-        const res = await apiFetch("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify({ username, password }),
-        });
-        if (res.token && res.user) {
-          localStorage.setItem(TOKEN_KEY, res.token);
-          setUser((prev) => mapApiUser(res.user, prev));
-          showToast(`Welcome back, ${res.user.name}!`);
-          navigate(res.user.role === "RECIPIENT" ? "/recipient-dashboard" : "/donor-dashboard");
-          return true;
-        }
-      } catch (err) {
-        showToast(err.message, "warn");
-        return false;
-      }
+  const loginUser = async ({ username, password }) => {
+    if (serviceUnavailable) {
+      showToast("Service is currently unavailable.", "warn");
+      return false;
     }
+    if (!password) {
+      showToast("Please enter your password to sign in.", "warn");
+      return false;
+    }
+    try {
+      const res = await apiFetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.token && res.user) {
+        localStorage.setItem(TOKEN_KEY, res.token);
+        setUser((prev) => mapApiUser(res.user, prev));
+        showToast(`Welcome back, ${res.user.name}!`);
+        navigate(res.user.role === "RECIPIENT" ? "/recipient-dashboard" : "/donor-dashboard");
+        return true;
+      }
+      showToast("Login failed. Please try again.", "warn");
+      return false;
+    } catch (err) {
+      showToast(err.message, "warn");
+      return false;
+    }
+  };
 
-    setUser((prev) => ({
-      ...prev,
-      loggedIn: true,
-      role: role || prev.role,
-      name: username?.trim() || prev.name,
-      lastConfirmed: "Just now",
-    }));
-    showToast(`Welcome back, ${username?.trim() || user.name}!`);
-    navigate(role === "recipient" ? "/recipient-dashboard" : "/donor-dashboard");
-    return true;
+  const demoLogin = async (role = "donor") => {
+    if (serviceUnavailable || !demoMode) {
+      showToast("Demo Mode is disabled.", "warn");
+      return false;
+    }
+    try {
+      const res = await apiFetch("/api/auth/demo-login", {
+        method: "POST",
+        body: JSON.stringify({ role }),
+      });
+      if (res.token && res.user) {
+        localStorage.setItem(TOKEN_KEY, res.token);
+        setUser((prev) => mapApiUser(res.user, prev));
+        try {
+          const [donorsRes, reqsRes, chatsRes, invitesRes] = await Promise.all([
+            apiFetch("/api/donors"),
+            apiFetch("/api/requests"),
+            apiFetch("/api/chats"),
+            apiFetch("/api/chats/invitations"),
+          ]);
+          if (donorsRes.donors) setDonors(donorsRes.donors.map(mapApiDonor));
+          if (reqsRes.requests) setRequests(reqsRes.requests.map(mapApiRequest));
+          if (chatsRes.conversations) setConversations(chatsRes.conversations);
+          if (invitesRes) {
+            setChatInvitations({ received: invitesRes.received || [], sent: invitesRes.sent || [] });
+          }
+        } catch {
+          // Ignore non-critical demo prefetch errors
+        }
+        showToast(`Signed in to Demo Mode as ${res.user.name}.`);
+        navigate(role === "recipient" ? "/recipient-dashboard" : "/donor-dashboard");
+        return true;
+      }
+      return false;
+    } catch (err) {
+      showToast(err.message, "warn");
+      return false;
+    }
   };
 
   const saveSettings = async (updates) => {
-    if (apiConnected && localStorage.getItem(TOKEN_KEY)) {
-      try {
-        const res = await apiFetch("/api/settings", {
-          method: "PUT",
-          body: JSON.stringify({
-            name: updates.name,
-            email: updates.email,
-            phone: updates.phone,
-            bloodGroup: updates.blood,
-            city: updates.city,
-            area: updates.area,
-            available: updates.available,
-            strictPhoneShielding: updates.strictPhoneShielding,
-            matchingRadiusKm: updates.matchingRadius,
-          }),
-        });
-        if (res.user) {
-          setUser((prev) => mapApiUser(res.user, prev));
-          showToast("Account & privacy settings saved successfully!");
-          return true;
-        }
-      } catch (err) {
-        showToast(err.message, "warn");
-        return false;
-      }
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      showToast("Please sign in to save settings.", "warn");
+      return false;
     }
-    setUser((prev) => ({ ...prev, ...updates, lastConfirmed: "Just now" }));
-    showToast("Account & privacy settings saved successfully!");
-    return true;
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          name: updates.name,
+          email: updates.email,
+          phone: updates.phone,
+          bloodGroup: updates.blood,
+          city: updates.city,
+          area: updates.area,
+          available: updates.available,
+          strictPhoneShielding: updates.strictPhoneShielding,
+          matchingRadiusKm: updates.matchingRadius,
+        }),
+      });
+      if (res.user) {
+        setUser((prev) => mapApiUser(res.user, prev));
+        showToast("Account & privacy settings saved successfully!");
+        return true;
+      }
+      return false;
+    } catch (err) {
+      showToast(err.message, "warn");
+      return false;
+    }
   };
 
   const submitSafetyReport = async ({ targetUserId, category, reason, evidence }) => {
-    if (apiConnected && localStorage.getItem(TOKEN_KEY)) {
-      try {
-        const res = await apiFetch("/api/reports", {
-          method: "POST",
-          body: JSON.stringify({ targetUserId, category, reason, evidence }),
-        });
-        showToast(
-          res.autoRestricted
-            ? "Safety report submitted. Threshold reached: emergency request privileges restricted for 7 days."
-            : "Safety report submitted confidentially.",
-          "info"
-        );
-        return true;
-      } catch (err) {
-        showToast(err.message, "warn");
-        return false;
-      }
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      showToast("Please sign in to submit a safety report.", "warn");
+      return false;
     }
-    showToast("Safety report logged confidentially.", "info");
-    return true;
+    try {
+      const res = await apiFetch("/api/reports", {
+        method: "POST",
+        body: JSON.stringify({ targetUserId, category, reason, evidence }),
+      });
+      showToast(
+        res.autoRestricted
+          ? "Safety report submitted. Threshold reached: emergency request privileges restricted for 7 days."
+          : "Safety report submitted confidentially.",
+        "info"
+      );
+      return true;
+    } catch (err) {
+      showToast(err.message, "warn");
+      return false;
+    }
   };
 
   const signupUser = async (form) => {
@@ -1364,6 +1410,9 @@ function AppProvider({ children, defaultRoute }) {
     <AppContext.Provider
       value={{
         apiConnected,
+        demoMode,
+        serviceUnavailable,
+        demoLogin,
         route: routeState.path,
         params: routeState.params,
         navigate,
@@ -1424,7 +1473,40 @@ function AppProvider({ children, defaultRoute }) {
         setModal,
       }}
     >
-      {children}
+      {serviceUnavailable ? (
+        <div
+          role="alert"
+          data-testid="service-unavailable-screen"
+          className="min-h-screen bg-surface text-text flex items-center justify-center p-6"
+        >
+          <div className="max-w-md w-full bg-cardlow border border-cardtop rounded-3xl p-8 text-center flex flex-col gap-4 shadow-2xl">
+            <h1 className="text-2xl font-bold text-primary">Service Unavailable</h1>
+            <p className="text-sm text-muted">
+              Unable to reach the Life Link backend configuration endpoint. Authentication and database features are disabled.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="btn btn-primary w-full mt-2"
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {demoMode && (
+            <div
+              role="status"
+              data-testid="demo-mode-banner"
+              className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-slate-950 text-center text-xs font-bold py-1.5 px-4 shadow-md tracking-wide"
+            >
+              DEMO MODE — Isolated sample accounts &amp; data. Real records are never modified.
+            </div>
+          )}
+          <div className={demoMode ? "pt-7" : ""}>{children}</div>
+        </>
+      )}
     </AppContext.Provider>
   );
 }

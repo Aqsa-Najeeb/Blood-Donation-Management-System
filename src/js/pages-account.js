@@ -1,4 +1,4 @@
-﻿const { useEffect, useRef, useState } = React;
+const { useEffect, useRef, useState } = React;
 
 window.LifeLinkAccountPages = (() => {
   const { BLOOD_GROUPS, useApp } = window.LifeLink;
@@ -662,7 +662,7 @@ window.LifeLinkAccountPages = (() => {
 
   /* ---------- LOGIN PAGE (3441:6111) ---------- */
   function LoginPage() {
-    const { apiConnected, loginUser, navigate, showToast } = useApp();
+    const { demoMode, demoLogin, loginUser, navigate, showToast } = useApp();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState("donor");
@@ -737,39 +737,27 @@ window.LifeLinkAccountPages = (() => {
               </button>
             </form>
 
-            <div className="text-center text-[12px] text-line">Or quick demo sign-in</div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (apiConnected) {
-                    setRole("donor");
-                    setUsername("usman.khan");
-                    showToast("Entered demo donor username. Enter your password to log in.", "info");
-                  } else {
-                    loginUser({ username: "Usman Khan", role: "donor" });
-                  }
-                }}
-                className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
-              >
-                Demo Donor
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (apiConnected) {
-                    setRole("recipient");
-                    setUsername("farhan.malik");
-                    showToast("Entered demo recipient username. Enter your password to log in.", "info");
-                  } else {
-                    loginUser({ username: "Farhan Malik", role: "recipient" });
-                  }
-                }}
-                className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
-              >
-                Demo Recipient
-              </button>
-            </div>
+            {demoMode && (
+              <>
+                <div className="text-center text-[12px] text-line">Or quick demo sign-in</div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => demoLogin("donor")}
+                    className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
+                  >
+                    Demo Donor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => demoLogin("recipient")}
+                    className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
+                  >
+                    Demo Recipient
+                  </button>
+                </div>
+              </>
+            )}
 
             <p className="text-center text-[13px] text-muted">
               Donâ€™t have an account?{" "}

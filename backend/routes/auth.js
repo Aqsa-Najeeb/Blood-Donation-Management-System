@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { signToken, requireAuth } = require("../middleware/auth");
+const { isDemoEmail } = require("../modules/demoStore");
 const { sanitizeUser } = require("../utils/serializers");
 const { now } = require("../utils/clock");
 const {
@@ -146,6 +147,9 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
       const cleanEmail = String(email || "").trim().toLowerCase();
       if (!cleanEmail || !password) {
         return res.status(400).json({ error: "Email and password are required." });
+      }
+      if (isDemoEmail(cleanEmail)) {
+        return res.status(401).json({ error: "Demo accounts cannot authenticate against real database accounts." });
       }
 
       const lockKey = `login:${cleanEmail}`;
