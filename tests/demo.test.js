@@ -44,7 +44,7 @@ describe("Secure Demo Mode System", () => {
 
     const res = await request(app).get("/api/config");
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(res.body), ["demoMode"]);
+    assert.deepEqual(Object.keys(res.body), ["demoMode", "minAge", "agreementVersion"]);
     assert.equal(res.body.demoMode, false);
   });
 

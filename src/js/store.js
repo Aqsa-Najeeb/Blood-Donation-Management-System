@@ -654,6 +654,8 @@ function AppProvider({ children, defaultRoute }) {
 
   const [apiConnected, setApiConnected] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [minAge, setMinAge] = useState(18);
+  const [agreementVersion, setAgreementVersion] = useState("1.0");
   const [serviceUnavailable, setServiceUnavailable] = useState(false);
   const [user, setUser] = useState(saved?.user || INITIAL_USER);
   const [donors, setDonors] = useState(saved?.donors || INITIAL_DONORS);
@@ -677,6 +679,8 @@ function AppProvider({ children, defaultRoute }) {
         const cfg = await apiFetch("/api/config");
         if (!active) return;
         setDemoMode(Boolean(cfg?.demoMode));
+        if (Number.isInteger(cfg?.minAge)) setMinAge(cfg.minAge);
+        if (cfg?.agreementVersion) setAgreementVersion(String(cfg.agreementVersion));
       } catch {
         if (!active) return;
         setServiceUnavailable(true);
@@ -1081,7 +1085,7 @@ function AppProvider({ children, defaultRoute }) {
     try {
       const res = await apiFetch("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ identifier: username, username, password }),
       });
       if (res.token && res.user) {
         localStorage.setItem(TOKEN_KEY, res.token);
@@ -1199,12 +1203,15 @@ function AppProvider({ children, defaultRoute }) {
         method: "POST",
         body: JSON.stringify({
           name: form.name,
-          email: form.email,
+          username: form.username || undefined,
           password: form.password,
           phone: form.phone,
           bloodGroup: form.blood,
           city: form.city,
           area: form.area,
+          dateOfBirth: form.dateOfBirth,
+          ageConfirmed: Boolean(form.ageConfirmed),
+          agreementAccepted: Boolean(form.agreementAccepted),
         }),
       });
       if (res.token && res.user) {
@@ -1418,6 +1425,8 @@ function AppProvider({ children, defaultRoute }) {
       value={{
         apiConnected,
         demoMode,
+        minAge,
+        agreementVersion,
         serviceUnavailable,
         demoLogin,
         route: routeState.path,

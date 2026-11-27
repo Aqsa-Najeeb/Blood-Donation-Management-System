@@ -279,6 +279,27 @@
             </div>
           )}
         </section>
+
+        {/* Legal & Platform Policies */}
+        <section className="bg-cardlow rounded-3xl p-6 md:p-8 border border-cardtop/60 flex flex-col gap-3">
+          <h2 className="text-lg font-bold text-text">Legal &amp; Platform Policies</h2>
+          <p className="text-[12px] text-muted">
+            Agreement status:{" "}
+            <span className="text-text font-semibold">
+              {user.agreementAccepted ? `Accepted (v${user.agreementVersion || "1.0"})` : "Legacy account"}
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-3 text-[12px]">
+            <button onClick={() => navigate("/user-agreement")} className="text-primary hover:underline cursor-pointer">User Agreement</button>
+            <button onClick={() => navigate("/privacy-policy")} className="text-primary hover:underline cursor-pointer">Privacy Policy</button>
+            <button onClick={() => navigate("/terms-of-use")} className="text-primary hover:underline cursor-pointer">Terms of Use</button>
+            <button onClick={() => navigate("/community-guidelines")} className="text-primary hover:underline cursor-pointer">Community Guidelines</button>
+            <button onClick={() => navigate("/emergency-request-policy")} className="text-primary hover:underline cursor-pointer">Emergency Request Policy</button>
+            <button onClick={() => navigate("/donor-safety-policy")} className="text-primary hover:underline cursor-pointer">Donor Safety Policy</button>
+            <button onClick={() => navigate("/moderation-policy")} className="text-primary hover:underline cursor-pointer">Reporting &amp; Moderation</button>
+            <button onClick={() => navigate("/disclaimer")} className="text-primary hover:underline cursor-pointer">Disclaimer</button>
+          </div>
+        </section>
       </div>
     );
   }

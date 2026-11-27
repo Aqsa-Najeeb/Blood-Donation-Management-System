@@ -7,6 +7,16 @@ const { ChatPage, PrivacySettingsPage, LoginPage, SignupPage } = window.LifeLink
 const { ProfilePage } = window.LifeLinkProfilePages || {};
 const { SearchDonorsPage } = window.LifeLinkSearchPages || {};
 const { RequestsPage } = window.LifeLinkRequestPages || {};
+const {
+  UserAgreementPage,
+  PrivacyPolicyPage,
+  TermsOfUsePage,
+  CommunityGuidelinesPage,
+  EmergencyRequestPolicyPage,
+  DonorSafetyPolicyPage,
+  ModerationPolicyPage,
+  DisclaimerPage,
+} = window.LifeLinkPolicyPages || {};
 
 function RouterView() {
   const { route } = useApp();
@@ -43,6 +53,22 @@ function RouterView() {
         return <LoginPage />;
       case "/signup":
         return <SignupPage />;
+      case "/user-agreement":
+        return UserAgreementPage ? <UserAgreementPage /> : <HomePage />;
+      case "/privacy-policy":
+        return PrivacyPolicyPage ? <PrivacyPolicyPage /> : <HomePage />;
+      case "/terms-of-use":
+        return TermsOfUsePage ? <TermsOfUsePage /> : <HomePage />;
+      case "/community-guidelines":
+        return CommunityGuidelinesPage ? <CommunityGuidelinesPage /> : <HomePage />;
+      case "/emergency-request-policy":
+        return EmergencyRequestPolicyPage ? <EmergencyRequestPolicyPage /> : <HomePage />;
+      case "/donor-safety-policy":
+        return DonorSafetyPolicyPage ? <DonorSafetyPolicyPage /> : <HomePage />;
+      case "/moderation-policy":
+        return ModerationPolicyPage ? <ModerationPolicyPage /> : <HomePage />;
+      case "/disclaimer":
+        return DisclaimerPage ? <DisclaimerPage /> : <HomePage />;
       default:
         return <HomePage />;
     }

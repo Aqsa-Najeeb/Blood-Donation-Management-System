@@ -384,13 +384,13 @@ window.LifeLinkComponents = (() => {
             </div>
 
             <div className="lg:col-span-2 flex flex-col gap-3">
-              <h4 className="font-bold text-text text-[14px] tracking-[0.75px] uppercase">SUPPORT</h4>
+              <h4 className="font-bold text-text text-[14px] tracking-[0.75px] uppercase">POLICIES</h4>
               <div className="flex flex-col gap-2 text-[13px]">
-                <button onClick={() => navigate("/safety-faqs")} className="text-left hover:text-primary transition cursor-pointer">FAQs</button>
-                <button onClick={() => navigate("/how-it-works")} className="text-left hover:text-primary transition cursor-pointer">How It Works</button>
-                <button onClick={() => navigate("/privacy-settings")} className="text-left hover:text-primary transition cursor-pointer">Privacy & Settings</button>
-                <button onClick={() => navigate("/safety-faqs")} className="text-left hover:text-primary transition cursor-pointer">Blood Donation Guide</button>
-                <button onClick={resetDemoData} className="text-left text-line hover:text-primary transition cursor-pointer">Reset Demo State</button>
+                <button onClick={() => navigate("/user-agreement")} className="text-left hover:text-primary transition cursor-pointer">User Agreement</button>
+                <button onClick={() => navigate("/community-guidelines")} className="text-left hover:text-primary transition cursor-pointer">Community Guidelines</button>
+                <button onClick={() => navigate("/emergency-request-policy")} className="text-left hover:text-primary transition cursor-pointer">Emergency Request Policy</button>
+                <button onClick={() => navigate("/donor-safety-policy")} className="text-left hover:text-primary transition cursor-pointer">Donor Safety Policy</button>
+                <button onClick={() => navigate("/moderation-policy")} className="text-left hover:text-primary transition cursor-pointer">Reporting &amp; Moderation</button>
               </div>
             </div>
 
@@ -399,15 +399,22 @@ window.LifeLinkComponents = (() => {
               <p className="text-[13px] text-muted leading-relaxed">
                 Life Link is a voluntary community blood-donor coordination platform. Blood groups are declared and unverified.
               </p>
+              <div className="flex flex-wrap gap-3 text-[12px]">
+                <button onClick={() => navigate("/safety-faqs")} className="hover:text-primary transition cursor-pointer">FAQs</button>
+                <button onClick={() => navigate("/how-it-works")} className="hover:text-primary transition cursor-pointer">How It Works</button>
+                <button onClick={() => navigate("/privacy-settings")} className="hover:text-primary transition cursor-pointer">Privacy &amp; Settings</button>
+                <button onClick={resetDemoData} className="text-line hover:text-primary transition cursor-pointer">Reset Demo State</button>
+              </div>
             </div>
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-line">
             <p>© 2026 Life Link. All rights reserved. Approximate location only. Not an emergency medical service.</p>
-            <div className="flex items-center gap-6">
-              <button onClick={() => navigate("/privacy-settings")} className="hover:text-primary cursor-pointer">Privacy Policy</button>
-              <button onClick={() => navigate("/safety-faqs")} className="hover:text-primary cursor-pointer">Terms of Service</button>
-              <button onClick={() => navigate("/chat")} className="hover:text-primary cursor-pointer">Contact</button>
+            <div className="flex flex-wrap items-center gap-5">
+              <button onClick={() => navigate("/user-agreement")} className="hover:text-primary cursor-pointer">User Agreement</button>
+              <button onClick={() => navigate("/privacy-policy")} className="hover:text-primary cursor-pointer">Privacy Policy</button>
+              <button onClick={() => navigate("/terms-of-use")} className="hover:text-primary cursor-pointer">Terms of Use</button>
+              <button onClick={() => navigate("/disclaimer")} className="hover:text-primary cursor-pointer">Disclaimer</button>
             </div>
           </div>
         </div>

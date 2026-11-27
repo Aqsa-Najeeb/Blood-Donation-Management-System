@@ -6,6 +6,11 @@ const { isDemoEmail } = require("../modules/demoStore");
 const { sanitizeUser } = require("../utils/serializers");
 const { now } = require("../utils/clock");
 const {
+  CURRENT_AGREEMENT_VERSION,
+  MIN_AGE_YEARS,
+  parseDateOfBirth,
+} = require("../config/policies");
+const {
   VALID_BLOOD_GROUPS,
   sanitizeText,
   isValidEmail,
@@ -51,15 +56,54 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
   // POST /api/auth/register
   router.post("/register", ...(authLimiter ? [authLimiter] : []), async (req, res, next) => {
     try {
-      const { name, email, username, password, phone, bloodGroup, city, area } = req.body || {};
+      const {
+        name,
+        email,
+        username,
+        password,
+        phone,
+        bloodGroup,
+        city,
+        area,
+        dateOfBirth,
+        ageConfirmed,
+        agreementAccepted,
+      } = req.body || {};
 
       const cleanName = sanitizeText(name, 100);
       if (cleanName.length < 2) {
         return res.status(400).json({ error: "Name must be at least 2 characters." });
       }
 
-      if (!email || !isValidEmail(email)) {
-        return res.status(400).json({ error: "Please provide a valid email address." });
+      if (agreementAccepted !== true) {
+        return res.status(400).json({
+          error: "You must read and agree to the LIFE LINK User Agreement before registering.",
+        });
+      }
+
+      if (ageConfirmed !== true) {
+        return res.status(400).json({
+          error: `You must confirm that you meet the minimum age requirement (${MIN_AGE_YEARS}+).`,
+        });
+      }
+
+      const currentNow = now();
+      const dobCheck = parseDateOfBirth(dateOfBirth, currentNow);
+      if (dobCheck.error) {
+        return res.status(400).json({ error: dobCheck.error });
+      }
+      if (dobCheck.ageYears < MIN_AGE_YEARS) {
+        return res.status(400).json({
+          error: `You must be at least ${MIN_AGE_YEARS} years old to register on LIFE LINK.`,
+        });
+      }
+
+      let normalizedEmail = null;
+      if (email !== undefined && email !== null && String(email).trim() !== "") {
+        if (!isValidEmail(email)) {
+          return res.status(400).json({ error: "Please provide a valid email address." });
+        }
+        normalizedEmail = String(email).trim().toLowerCase();
       }
 
       if (!password || !isStrongPassword(password)) {
@@ -91,20 +135,24 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
         return res.status(400).json({ error: "Area is required." });
       }
 
-      const normalizedEmail = String(email).trim().toLowerCase();
+      const baseHandle = normalizedEmail
+        ? normalizedEmail.split("@")[0].replace(/[^a-z0-9._-]/g, "")
+        : cleanName.toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 20) || "user";
       const rawUser = username
         ? sanitizeText(username, 60).toLowerCase().replace(/[^a-z0-9._-]/g, "")
-        : `${normalizedEmail.split("@")[0].replace(/[^a-z0-9._-]/g, "")}_${Math.floor(100 + Math.random() * 900)}`;
+        : `${baseHandle}_${crypto.randomBytes(2).toString("hex")}`;
 
       if (rawUser.length < 3) {
         return res.status(400).json({ error: "Username must be at least 3 alphanumeric characters." });
       }
 
+      const clashConditions = [{ username: rawUser }];
+      if (normalizedEmail) clashConditions.push({ email: normalizedEmail });
       const existing = await prisma.user.findFirst({
-        where: { OR: [{ email: normalizedEmail }, { username: rawUser }] },
+        where: { OR: clashConditions },
       });
       if (existing) {
-        return res.status(409).json({ error: "An account with this email or username already exists." });
+        return res.status(409).json({ error: "An account with this username or email already exists." });
       }
 
       const passwordHash = await bcrypt.hash(String(password), 10);
@@ -127,6 +175,12 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
           online: true,
           seenLabel: "Available Now",
           replyLabel: "< 15 mins",
+          agreementAccepted: true,
+          agreementVersion: CURRENT_AGREEMENT_VERSION,
+          agreementAcceptedAt: currentNow,
+          ageVerified: true,
+          ageVerifiedAt: currentNow,
+          dateOfBirth: dobCheck.dobDate,
         },
       });
 
@@ -140,32 +194,34 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
     }
   });
 
-  // POST /api/auth/login
+  // POST /api/auth/login — supports username or email identifier
   router.post("/login", ...(authLimiter ? [authLimiter] : []), async (req, res, next) => {
     try {
-      const { email, password } = req.body || {};
-      const cleanEmail = String(email || "").trim().toLowerCase();
-      if (!cleanEmail || !password) {
-        return res.status(400).json({ error: "Email and password are required." });
+      const { identifier, username, email, password } = req.body || {};
+      const cleanId = String(identifier || username || email || "").trim().toLowerCase();
+      if (!cleanId || !password) {
+        return res.status(400).json({ error: "Username/email and password are required." });
       }
-      if (isDemoEmail(cleanEmail)) {
+      if (isDemoEmail(cleanId)) {
         return res.status(401).json({ error: "Demo accounts cannot authenticate against real database accounts." });
       }
 
-      const lockKey = `login:${cleanEmail}`;
+      const lockKey = `login:${cleanId}`;
       if (checkAccountLock(lockKey)) {
         return res.status(429).json({
           error: "Account locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.",
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email: cleanEmail },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: cleanId }, { username: cleanId }],
+        },
       });
 
       if (!user) {
         recordFailure(lockKey);
-        return res.status(401).json({ error: "Invalid email or password." });
+        return res.status(401).json({ error: "Invalid credentials." });
       }
 
       if (user.deactivatedAt) {
@@ -175,7 +231,7 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
       const match = await bcrypt.compare(String(password), user.passwordHash);
       if (!match) {
         recordFailure(lockKey);
-        return res.status(401).json({ error: "Invalid email or password." });
+        return res.status(401).json({ error: "Invalid credentials." });
       }
 
       resetFailures(lockKey);
@@ -189,6 +245,30 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
         token,
         user: sanitizeUser(user, { includePrivate: true }),
       });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // POST /api/auth/accept-agreement — re-accept latest User Agreement version
+  router.post("/accept-agreement", requireAuth, async (req, res, next) => {
+    try {
+      if (req.body?.agreementAccepted !== true) {
+        return res.status(400).json({ error: "You must accept the User Agreement." });
+      }
+      const current = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!current || current.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
+      }
+      const updated = await prisma.user.update({
+        where: { id: req.user.id },
+        data: {
+          agreementAccepted: true,
+          agreementVersion: CURRENT_AGREEMENT_VERSION,
+          agreementAcceptedAt: now(),
+        },
+      });
+      return res.json({ user: sanitizeUser(updated, { includePrivate: true }) });
     } catch (err) {
       return next(err);
     }

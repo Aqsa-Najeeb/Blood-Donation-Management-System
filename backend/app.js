@@ -12,6 +12,7 @@ const createSettingsRouter = require("./routes/settings");
 const { setNotificationPrisma } = require("./modules/notifications");
 const { setRestrictionPrisma } = require("./modules/restrictions");
 const { isDemoModeEnabled } = require("./config/demoMode");
+const { CURRENT_AGREEMENT_VERSION, MIN_AGE_YEARS } = require("./config/policies");
 const { createDemoMiddleware } = require("./modules/demoStore");
 
 function createApp(prisma, { skipRateLimiters = false } = {}) {
@@ -127,6 +128,8 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
   app.get("/api/config", (_req, res) => {
     return res.json({
       demoMode: isDemoModeEnabled(),
+      minAge: MIN_AGE_YEARS,
+      agreementVersion: CURRENT_AGREEMENT_VERSION,
     });
   });
 

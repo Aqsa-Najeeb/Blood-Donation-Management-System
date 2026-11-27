@@ -713,12 +713,12 @@ window.LifeLinkAccountPages = (() => {
 
             <form onSubmit={submit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-[12px] font-semibold text-text mb-1.5">Username</label>
+                <label className="block text-[12px] font-semibold text-text mb-1.5">Username or Email</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
+                  placeholder="Enter your username or email"
                   className="input-pill"
                 />
               </div>
@@ -768,6 +768,20 @@ window.LifeLinkAccountPages = (() => {
                 Sign Up
               </button>
             </p>
+            <div className="flex flex-wrap justify-center gap-3 text-[11px] text-line pt-1 border-t border-cardtop/40">
+              <button type="button" onClick={() => navigate("/user-agreement")} className="hover:text-primary cursor-pointer">
+                User Agreement
+              </button>
+              <button type="button" onClick={() => navigate("/privacy-policy")} className="hover:text-primary cursor-pointer">
+                Privacy Policy
+              </button>
+              <button type="button" onClick={() => navigate("/terms-of-use")} className="hover:text-primary cursor-pointer">
+                Terms of Use
+              </button>
+              <button type="button" onClick={() => navigate("/disclaimer")} className="hover:text-primary cursor-pointer">
+                Disclaimer
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -776,28 +790,50 @@ window.LifeLinkAccountPages = (() => {
 
   /* ---------- SIGN UP PAGE (3441:6260) ---------- */
   function SignupPage() {
-    const { params, signupUser, navigate, showToast } = useApp();
+    const { params, minAge, agreementVersion, signupUser, navigate, showToast } = useApp();
     const [role, setRole] = useState(params.role === "recipient" ? "recipient" : "donor");
     const [name, setName] = useState("");
+    const [username, setUsername] = useState("");
     const [phone, setPhone] = useState("");
-    const [email, setEmail] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
     const [blood, setBlood] = useState("");
     const [city, setCity] = useState("Lahore, Pakistan");
     const [area, setArea] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
+    const [ageConfirmed, setAgeConfirmed] = useState(false);
+    const [agreementAccepted, setAgreementAccepted] = useState(false);
 
     const submit = (e) => {
       e.preventDefault();
-      if (!name.trim() || !email.includes("@") || !blood || !phone.trim() || !area.trim()) {
-        showToast("Please fill in your full name, phone, valid email, area, and blood group.", "warn");
+      if (!name.trim() || !username.trim() || !blood || !phone.trim() || !area.trim() || !dateOfBirth) {
+        showToast("Please fill in your full name, username, phone, date of birth, area, and blood group.", "warn");
+        return;
+      }
+      if (!ageConfirmed) {
+        showToast(`Please confirm that you meet the minimum age requirement (${minAge}+).`, "warn");
+        return;
+      }
+      if (!agreementAccepted) {
+        showToast("Please read and agree to the LIFE LINK User Agreement.", "warn");
         return;
       }
       if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password) || password !== confirm) {
         showToast("Passwords must match, be 8+ chars, and include a letter and number.", "warn");
         return;
       }
-      signupUser({ name, phone, email, blood, city, area, password });
+      signupUser({
+        name,
+        username,
+        phone,
+        dateOfBirth,
+        ageConfirmed,
+        agreementAccepted,
+        blood,
+        city,
+        area,
+        password,
+      });
     };
 
     return (
@@ -878,12 +914,21 @@ window.LifeLinkAccountPages = (() => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-text mb-1">Email Address</label>
+                  <label className="block text-[12px] font-semibold text-text mb-1">Username</label>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="john.doe"
+                    className="input-pill"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-text mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
                     className="input-pill"
                   />
                 </div>
@@ -930,6 +975,56 @@ window.LifeLinkAccountPages = (() => {
                     className="input-pill"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-1 text-[12px] text-muted">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={(e) => setAgeConfirmed(e.target.checked)}
+                    className="mt-0.5 accent-primary cursor-pointer"
+                  />
+                  <span>
+                    I confirm that I meet the minimum age requirement ({minAge || 18}+) to use LIFE LINK.
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreementAccepted}
+                    onChange={(e) => setAgreementAccepted(e.target.checked)}
+                    className="mt-0.5 accent-primary cursor-pointer"
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/user-agreement")}
+                      className="text-primary font-semibold hover:underline cursor-pointer"
+                    >
+                      LIFE LINK User Agreement (v{agreementVersion || "1.0"})
+                    </button>
+                    ,{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/privacy-policy")}
+                      className="text-primary hover:underline cursor-pointer"
+                    >
+                      Privacy Policy
+                    </button>
+                    , and{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/terms-of-use")}
+                      className="text-primary hover:underline cursor-pointer"
+                    >
+                      Terms of Use
+                    </button>
+                    .
+                  </span>
+                </label>
               </div>
 
               <button type="submit" className="btn btn-primary w-full mt-2">

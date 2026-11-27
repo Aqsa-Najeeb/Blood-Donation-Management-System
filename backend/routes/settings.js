@@ -21,6 +21,12 @@ const PROTECTED_USER_FIELDS = [
   "passwordHash",
   "lastAvailabilityUpdate",
   "deactivatedAt",
+  "agreementAccepted",
+  "agreementVersion",
+  "agreementAcceptedAt",
+  "ageVerified",
+  "ageVerifiedAt",
+  "dateOfBirth",
 ];
 
 const REPORT_THRESHOLD = 3;

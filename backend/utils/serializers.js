@@ -1,4 +1,5 @@
 const { getExpiryAt } = require("../modules/requestLifecycle");
+const { CURRENT_AGREEMENT_VERSION } = require("../config/policies");
 
 function sanitizeUser(user, { includePrivate = false } = {}) {
   if (!user) return null;
@@ -27,11 +28,19 @@ function sanitizeUser(user, { includePrivate = false } = {}) {
   };
 
   if (includePrivate && !isDeactivated) {
-    base.email = user.email;
+    base.email = user.email || null;
     base.phone = user.phone;
     base.strictPhoneShielding = user.strictPhoneShielding;
     base.safetyFlags = user.safetyFlags;
     base.restrictedUntil = user.restrictedUntil;
+    base.agreementAccepted = Boolean(user.agreementAccepted);
+    base.agreementVersion = user.agreementVersion || null;
+    base.agreementAcceptedAt = user.agreementAcceptedAt || null;
+    base.ageVerified = Boolean(user.ageVerified);
+    base.ageVerifiedAt = user.ageVerifiedAt || null;
+    base.needsAgreementUpdate =
+      Boolean(user.agreementAccepted) &&
+      user.agreementVersion !== CURRENT_AGREEMENT_VERSION;
   } else {
     base.phone = isDeactivated ? null : user.phone ? maskPhone(user.phone) : null;
   }

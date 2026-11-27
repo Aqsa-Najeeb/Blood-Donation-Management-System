@@ -54,7 +54,7 @@ model User {
   id                   Int                 @id @default(autoincrement())
   name                 String              @db.VarChar(120)
   username             String              @unique @db.VarChar(80)
-  email                String              @unique @db.VarChar(160)
+  email                String?             @unique @db.VarChar(160)
   passwordHash         String              @db.VarChar(255)
   phone                String              @db.VarChar(30)
   isDonor              Boolean             @default(false)
@@ -74,6 +74,12 @@ model User {
   matchingRadiusKm     Int                 @default(10)
   safetyFlags          Int                 @default(0)
   restrictedUntil      DateTime?
+  agreementAccepted    Boolean             @default(false)
+  agreementVersion     String?             @db.VarChar(20)
+  agreementAcceptedAt  DateTime?
+  ageVerified          Boolean             @default(false)
+  ageVerifiedAt        DateTime?
+  dateOfBirth          DateTime?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 

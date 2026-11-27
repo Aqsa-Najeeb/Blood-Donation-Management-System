@@ -43,6 +43,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /8-128/);
@@ -57,6 +60,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 201);
     assert.ok(res.body.token);
@@ -72,6 +78,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 201);
     assert.ok(res.body.token);
@@ -87,6 +96,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /8-128/);
@@ -101,6 +113,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /letter.*number|number.*letter/i);
@@ -115,6 +130,9 @@ describe("POST /api/auth/register — password BVA", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /letter.*number|number.*letter/i);
@@ -130,6 +148,9 @@ describe("POST /api/auth/register — required fields", () => {
     bloodGroup: "O+",
     city: "Lahore",
     area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
   };
 
   it("rejects when name is missing", async () => {
@@ -138,10 +159,10 @@ describe("POST /api/auth/register — required fields", () => {
     assert.equal(res.status, 400);
   });
 
-  it("rejects when email is missing", async () => {
+  it("allows signup when email is omitted (optional)", async () => {
     const { email, ...body } = { ...validBase };
     const res = await request(app).post("/api/auth/register").send(body);
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 201);
   });
 
   it("rejects when password is missing", async () => {
@@ -228,6 +249,9 @@ describe("POST /api/auth/register — schema & role rules", () => {
       bloodGroup: "A+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 201);
     assert.equal(res.body.user.isDonor, false);
@@ -243,6 +267,9 @@ describe("POST /api/auth/register — schema & role rules", () => {
       bloodGroup: "B+",
       city: "Lahore",
       area: "Gulberg III",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
       role: "COORDINATOR",
     });
     // Should succeed (role is ignored)
@@ -262,6 +289,9 @@ describe("POST /api/auth/register — schema & role rules", () => {
       bloodGroup: "O-",
       city: "Lahore",
       area: "Shadman",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     assert.equal(res.status, 201);
     assert.ok(!res.body.user.passwordHash);
@@ -279,6 +309,9 @@ describe("POST /api/auth/register — schema & role rules", () => {
         bloodGroup: bg,
         city: "Lahore",
         area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
       });
       assert.equal(res.status, 201, `Expected 201 for blood group ${bg}`);
     }
@@ -301,6 +334,9 @@ describe("POST /api/auth/login", () => {
       bloodGroup: "O+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
   });
 
@@ -342,6 +378,9 @@ describe("POST /api/auth/login", () => {
       bloodGroup: "A-",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
 
     // 5 wrong attempts
@@ -384,6 +423,9 @@ describe("GET /api/auth/me — auth required", () => {
       bloodGroup: "B+",
       city: "Lahore",
       area: "Model Town",
+      dateOfBirth: "1995-05-15",
+      ageConfirmed: true,
+      agreementAccepted: true,
     });
     const { token } = regRes.body;
 

@@ -41,6 +41,9 @@ async function registerAndToken(overrides = {}) {
     bloodGroup: "O+",
     city: "Lahore",
     area: "Model Town",
+    dateOfBirth: "1995-05-15",
+    ageConfirmed: true,
+    agreementAccepted: true,
     ...overrides,
   };
   const res = await request(app).post("/api/auth/register").send(payload);

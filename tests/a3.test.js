@@ -31,6 +31,9 @@ before(async () => {
     bloodGroup: "O+",
     city: "Lahore",
     area: "Model Town",
+    dateOfBirth: "1995-05-15",
+    ageConfirmed: true,
+    agreementAccepted: true,
   });
   assert.equal(reg.status, 201);
   searcherToken = reg.body.token;
