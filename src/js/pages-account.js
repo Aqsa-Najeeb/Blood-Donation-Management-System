@@ -1,432 +1,319 @@
-const { useEffect, useRef, useState } = React;
+﻿const { useEffect, useRef, useState } = React;
 
 window.LifeLinkAccountPages = (() => {
   const { BLOOD_GROUPS, useApp } = window.LifeLink;
   const { WRAP, LahoreMapPreview } = window.LifeLinkComponents;
 
-  /* ---------- IN-APP CHAT (3552:3817) ---------- */
+  /* ---------- IN-APP CHAT (Pair-based, C2) ---------- */
   function ChatPage() {
     const {
-      threads,
-      setThreads,
-      activeThreadId,
-      setActiveThreadId,
-      donors,
-      requests,
+      conversations,
+      setConversations,
+      chatInvitations,
+      setChatInvitations,
+      activeConversationId,
+      setActiveConversationId,
       sendMessage,
       submitSafetyReport,
       navigate,
       showToast,
       setModal,
+      user,
     } = useApp();
 
-    const [search, setSearch] = useState("");
-    const [tab, setTab] = useState("active");
+    const [tab, setTab] = useState("conversations");
     const [draft, setDraft] = useState("");
-    const [safetyOpen, setSafetyOpen] = useState(false);
+    const [convMessages, setConvMessages] = useState([]);
+    const [activeConv, setActiveConv] = useState(null);
     const [reportCategory, setReportCategory] = useState("SUSPICIOUS_ACTIVITY");
     const [reportReason, setReportReason] = useState("");
     const feedRef = useRef(null);
 
-    const visibleThreads = threads
-      .filter((t) => (tab === "active" ? !t.archived : t.archived))
-      .filter((t) => {
-        const donor = donors.find((d) => d.id === t.donorId);
-        return (
-          !search.trim() ||
-          (donor?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-          t.hospital.toLowerCase().includes(search.toLowerCase()) ||
-          t.requestId.toLowerCase().includes(search.toLowerCase())
-        );
-      });
-
-    const activeThread = threads.find((t) => t.id === activeThreadId) || visibleThreads[0] || threads[0];
-    const activeDonor = donors.find((d) => d.id === activeThread?.donorId) || donors[0];
-    const activeReq = requests.find((r) => r.id === activeThread?.requestId) || requests[0];
+    useEffect(() => {
+      let active = true;
+      (async () => {
+        try {
+          const TOKEN_KEY = "ll_auth_token";
+          if (!localStorage.getItem(TOKEN_KEY)) return;
+          const headers = { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` };
+          const [convRes, invRes] = await Promise.all([
+            fetch("/api/chats", { headers }).then((r) => r.json()),
+            fetch("/api/chats/invitations", { headers }).then((r) => r.json()),
+          ]);
+          if (!active) return;
+          if (convRes.conversations) setConversations(convRes.conversations);
+          if (invRes) setChatInvitations({ received: invRes.received || [], sent: invRes.sent || [] });
+        } catch {}
+      })();
+      return () => { active = false; };
+    }, []);
 
     useEffect(() => {
-      if (feedRef.current) {
-        feedRef.current.scrollTop = feedRef.current.scrollHeight;
-      }
-    }, [activeThread?.messages?.length, activeThread?.id]);
+      if (!activeConversationId) { setConvMessages([]); setActiveConv(null); return; }
+      let active = true;
+      (async () => {
+        try {
+          const TOKEN_KEY = "ll_auth_token";
+          const headers = { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` };
+          const res = await fetch(`/api/chats/${activeConversationId}`, { headers }).then((r) => r.json());
+          if (!active) return;
+          if (res.conversation) {
+            setActiveConv(res.conversation);
+            setConvMessages(res.conversation.messages || []);
+          }
+        } catch {}
+      })();
+      return () => { active = false; };
+    }, [activeConversationId]);
 
-    const handleSend = (e) => {
+    useEffect(() => {
+      if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }, [convMessages.length, activeConversationId]);
+
+    const handleSend = async (e) => {
       e.preventDefault();
-      if (!draft.trim() || !activeThread) return;
-      sendMessage(activeThread.id, draft, "recipient");
+      if (!draft.trim() || !activeConversationId) return;
+      await sendMessage(activeConversationId, draft);
       setDraft("");
+      try {
+        const TOKEN_KEY = "ll_auth_token";
+        const headers = { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` };
+        const res = await fetch(`/api/chats/${activeConversationId}`, { headers }).then((r) => r.json());
+        if (res.conversation) setConvMessages(res.conversation.messages || []);
+      } catch {}
     };
 
-    const handleQuickChip = (text) => {
-      if (!activeThread) return;
-      sendMessage(activeThread.id, text, "recipient");
+    const handleInvitation = async (invId, action) => {
+      try {
+        const TOKEN_KEY = "ll_auth_token";
+        const res = await fetch(`/api/chats/invitations/${invId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+          body: JSON.stringify({ action }),
+        }).then((r) => r.json());
+        showToast(`Invitation ${action.toLowerCase()}ed.`);
+        const invRes = await fetch("/api/chats/invitations", {
+          headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+        }).then((r) => r.json());
+        setChatInvitations({ received: invRes.received || [], sent: invRes.sent || [] });
+        if (action === "ACCEPT" && res.conversation) {
+          const convRes = await fetch("/api/chats", {
+            headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+          }).then((r) => r.json());
+          if (convRes.conversations) setConversations(convRes.conversations);
+          setActiveConversationId(res.conversation.id);
+          setTab("conversations");
+        }
+      } catch (err) {
+        showToast(err.message || "Failed to respond to invitation.", "warn");
+      }
     };
 
-    const endChat = () => {
-      if (!activeThread) return;
-      setThreads((prev) =>
-        prev.map((t) => (t.id === activeThread.id ? { ...t, archived: true, statusTag: "Archived" } : t))
+    const handleRestrict = async (convId, action) => {
+      try {
+        const TOKEN_KEY = "ll_auth_token";
+        await fetch(`/api/chats/${convId}/restrict`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+          body: JSON.stringify({ action }),
+        }).then((r) => r.json());
+        showToast(action === "apply" ? "Restriction applied." : "Restriction removed. A new invitation is needed to resume messaging.");
+        const convRes = await fetch("/api/chats", {
+          headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+        }).then((r) => r.json());
+        if (convRes.conversations) setConversations(convRes.conversations);
+      } catch (err) {
+        showToast(err.message || "Failed.", "warn");
+      }
+    };
+
+    if (!user.loggedIn) {
+      return (
+        <div className={`${WRAP} py-16 text-center`}>
+          <h1 className="text-2xl font-bold text-text mb-2">Sign In Required</h1>
+          <p className="text-muted text-sm mb-4">You need to be signed in to use chat.</p>
+          <button onClick={() => navigate("/login")} className="btn btn-primary px-6 py-3">Sign In</button>
+        </div>
       );
-      showToast("Conversation archived safely.", "info");
-    };
+    }
 
     return (
       <div className={`${WRAP} py-6 flex flex-col gap-4`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[12px]">
-          <div className="text-muted">
-            Network › Transfusion Coordination ›{" "}
-            <span className="text-text font-semibold">Live Case #{activeThread?.requestId}</span>
-          </div>
-          <div className="text-primary font-semibold">
-    ● Relay Channel Active
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold text-text">ðŸ’¬ Chats</h1>
+          <div className="text-[12px] text-muted">Pair-based messaging</div>
         </div>
 
-        {/* 3-Column Chat Workspace */}
-        <div className="grid lg:grid-cols-12 gap-4 items-stretch min-h-[680px]">
-          {/* Column 1: Conversations Sidebar */}
-          <aside className="lg:col-span-3 bg-cardlow rounded-3xl p-4 border border-cardtop/50 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-text">Messages</h2>
-              <span className="text-[11px] text-primary">{threads.length} Threads</span>
-            </div>
-
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search donor or hospital..."
-              className="input-pill h-10 text-[12px]"
-            />
-
-            <div className="grid grid-cols-2 bg-surface/70 p-1 rounded-full">
-              <button
-                onClick={() => setTab("active")}
-                className={`py-1.5 rounded-full text-[11px] font-semibold cursor-pointer ${
-                  tab === "active" ? "bg-cardtop text-primary" : "text-muted"
-                }`}
-              >
-                Active Requests ({threads.filter((t) => !t.archived).length})
-              </button>
-              <button
-                onClick={() => setTab("archive")}
-                className={`py-1.5 rounded-full text-[11px] font-semibold cursor-pointer ${
-                  tab === "archive" ? "bg-cardtop text-primary" : "text-muted"
-                }`}
-              >
-                Archive ({threads.filter((t) => t.archived).length})
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
-              {visibleThreads.map((t) => {
-                const d = donors.find((x) => x.id === t.donorId);
-                const selected = activeThread?.id === t.id;
-                const lastMsg = t.messages[t.messages.length - 1];
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setActiveThreadId(t.id);
-                      setThreads((prev) =>
-                        prev.map((x) => (x.id === t.id ? { ...x, unread: 0 } : x))
-                      );
-                    }}
-                    className={`p-3.5 rounded-2xl text-left border transition cursor-pointer ${
-                      selected
-                        ? "bg-cardhigh border-peach/60"
-                        : "bg-card/60 hover:bg-card border-cardtop/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-cardtop text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
-                          {d?.initials || "DN"}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-bold text-text truncate">{d?.name}</div>
-                          <div className="text-[10px] text-primary">{d?.blood} • #{t.requestId}</div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-line shrink-0">{t.lastTime}</span>
-                    </div>
-                    <p className="text-[11px] text-muted truncate mt-2">
-                      “{lastMsg?.text || "No messages yet"}”
-                    </p>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <span className="text-[10px] text-emerald-400">● {t.statusTag}</span>
-                      {t.unread > 0 && (
-                        <span className="w-4 h-4 rounded-full bg-peach text-[#633e2a] text-[10px] font-bold flex items-center justify-center">
-                          {t.unread}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
+        <div className="flex gap-2 text-[12px]">
+          {[
+            { id: "conversations", label: `Conversations (${conversations.length})` },
+            { id: "received", label: `Received (${chatInvitations.received.filter((i) => i.status === "PENDING").length})` },
+            { id: "sent", label: `Sent (${chatInvitations.sent.length})` },
+          ].map((t) => (
             <button
-              onClick={() => navigate("/find-donors")}
-              className="w-full py-2.5 rounded-full bg-card hover:bg-cardhigh text-primary text-[12px] font-semibold border border-cardtop cursor-pointer"
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-full font-semibold cursor-pointer ${
+                tab === t.id ? "bg-peach text-[#633e2a]" : "bg-card text-muted hover:text-text"
+              }`}
             >
-              ⊕ Invite Secondary Standby
+              {t.label}
             </button>
-          </aside>
+          ))}
+        </div>
 
-          {/* Column 2: Main Active Chat Window */}
-          <section className="lg:col-span-6 bg-cardlow rounded-3xl border border-cardtop/50 flex flex-col overflow-hidden">
-            {/* Chat Header */}
-            <div className="p-4 md:px-6 border-b border-cardtop/50 flex flex-wrap items-center justify-between gap-3 bg-card/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-cardtop text-primary font-bold flex items-center justify-center">
-                  {activeDonor?.initials}
+        <div className="grid lg:grid-cols-12 gap-4 items-stretch min-h-[600px]">
+          <aside className="lg:col-span-4 bg-cardlow rounded-3xl p-4 border border-cardtop/50 flex flex-col gap-3 overflow-y-auto">
+            {tab === "conversations" && conversations.map((c) => {
+              const selected = activeConversationId === c.id;
+              const restricted = c.restrictedById !== null;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveConversationId(c.id)}
+                  className={`p-3.5 rounded-2xl text-left border transition cursor-pointer ${
+                    selected ? "bg-cardhigh border-peach/60" : "bg-card/60 hover:bg-card border-cardtop/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-cardtop text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
+                      {(c.partner?.name || "?").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-bold text-text truncate">{c.partner?.name || "User"}</div>
+                      <div className="text-[10px] text-primary">{c.partner?.bloodGroup || ""} â€¢ {c.partner?.area || ""}</div>
+                    </div>
+                  </div>
+                  {restricted && <span className="text-[10px] text-danger mt-1 inline-block">ðŸš« Restricted</span>}
+                  {c.requiresReinvite && !restricted && <span className="text-[10px] text-amber-400 mt-1 inline-block">âš  Reinvite needed</span>}
+                </button>
+              );
+            })}
+            {tab === "received" && chatInvitations.received.map((inv) => (
+              <div key={inv.id} className="p-3.5 rounded-2xl bg-card/60 border border-cardtop/40 flex flex-col gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-cardtop text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
+                    {(inv.sender?.name || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-bold text-text">{inv.sender?.name || "User"}</div>
+                    <div className="text-[10px] text-muted">Status: {inv.status}</div>
+                  </div>
+                </div>
+                {inv.status === "PENDING" && (
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => handleInvitation(inv.id, "ACCEPT")} className="btn btn-primary text-[11px] py-1.5 px-3">Accept</button>
+                    <button onClick={() => handleInvitation(inv.id, "REJECT")} className="px-3 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] text-muted cursor-pointer">Reject</button>
+                    <button onClick={() => handleInvitation(inv.id, "RESTRICT")} className="px-3 py-1.5 rounded-full bg-danger/20 hover:bg-danger/40 text-[11px] text-danger cursor-pointer">Restrict</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {tab === "sent" && chatInvitations.sent.map((inv) => (
+              <div key={inv.id} className="p-3.5 rounded-2xl bg-card/60 border border-cardtop/40 flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-cardtop text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
+                  {(inv.recipient?.name || "?").slice(0, 2).toUpperCase()}
                 </div>
                 <div>
+                  <div className="text-[13px] font-bold text-text">{inv.recipient?.name || "User"}</div>
+                  <div className="text-[10px] text-muted">Status: {inv.status}</div>
+                </div>
+              </div>
+            ))}
+            {tab === "conversations" && conversations.length === 0 && (
+              <div className="text-center text-[12px] text-muted py-6">No conversations yet. Use the Message button on a donor profile to start one.</div>
+            )}
+          </aside>
+
+          <section className="lg:col-span-8 bg-cardlow rounded-3xl border border-cardtop/50 flex flex-col overflow-hidden">
+            {activeConv ? (
+              <>
+                <div className="p-4 md:px-6 border-b border-cardtop/50 flex flex-wrap items-center justify-between gap-3 bg-card/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-cardtop text-primary font-bold flex items-center justify-center">
+                      {(activeConv.partner?.name || "?").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h1 className="text-[15px] font-bold text-text">{activeConv.partner?.name}</h1>
+                      <div className="text-[11px] text-muted">{activeConv.partner?.bloodGroup} â€¢ {activeConv.partner?.area}</div>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-[15px] font-bold text-text">{activeDonor?.name}</h1>
-                    <span className="px-2 py-0.5 rounded-full bg-cardhigh text-primary text-[10px] font-semibold">
-                      {activeDonor?.blood} Voluntary
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-muted">
-                    Matched for #{activeThread?.requestId} • {activeThread?.hospital}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate("/request-track", { id: activeThread?.requestId })}
-                  className="px-3 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-text cursor-pointer"
-                >
-                  👁 Request Details
-                </button>
-                <button
-                  onClick={() =>
-                    setModal({
-                      eyebrow: "COMMUNITY SAFEGUARD",
-                      title: "Report Safety Concern",
-                      body: (
-                        <div className="flex flex-col gap-3">
-                          <p>
-                            Select a category and provide clear evidence. 3 independent reports trigger an automatic 7-day restriction on creating new emergency requests.
-                          </p>
-                          <select
-                            defaultValue={reportCategory}
-                            onChange={(e) => setReportCategory(e.target.value)}
-                            className="input-pill bg-surface"
-                          >
-                            <option value="FALSE_DONOR_INFO">False Donor Information</option>
-                            <option value="HARASSMENT">Harassment</option>
-                            <option value="INAPPROPRIATE_CONTENT">Inappropriate Content</option>
-                            <option value="SUSPICIOUS_ACTIVITY">Suspicious Activity</option>
-                          </select>
-                          <textarea
-                            rows="3"
-                            defaultValue={reportReason}
-                            onChange={(e) => setReportReason(e.target.value)}
-                            placeholder="Describe what happened (at least 10 characters)..."
-                            className="input-box"
-                          />
-                        </div>
-                      ),
-                      confirmLabel: "Submit Confidential Report",
-                      onConfirm: () =>
-                        submitSafetyReport({
-                          targetUserId: activeDonor?.id,
-                          category: reportCategory,
-                          reason:
-                            reportReason.trim().length >= 10
-                              ? reportReason.trim()
-                              : "Suspicious coordination behavior reported via in-app chat.",
-                        }),
-                    })
-                  }
-                  className="px-2.5 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] text-muted cursor-pointer"
-                  title="Report Issue"
-                >
-                  ⚑
-                </button>
-                <button
-                  onClick={endChat}
-                  className="px-3 py-1.5 rounded-full bg-card hover:bg-danger/20 text-[11px] font-semibold text-danger cursor-pointer"
-                >
-                  End Chat
-                </button>
-              </div>
-            </div>
-
-            {/* Privacy Shield Banner */}
-            <div className="mx-4 mt-4 p-3.5 rounded-2xl bg-surface/80 border border-cardtop flex items-start gap-3">
-              <span className="text-primary">🔒</span>
-              <div className="flex-1 text-[11px] text-muted leading-relaxed">
-                <div className="flex items-center justify-between">
-                  <strong className="text-text">Privacy Shield Active</strong>
-                  <span className="text-primary">Medical Protocol #SEC-4</span>
-                </div>
-                Phone numbers, personal IDs, and residential addresses are permanently shielded. Coordinate directly through this window to meet at the hospital transfusion facility.
-              </div>
-            </div>
-
-            {/* Message Feed */}
-            <div ref={feedRef} className="flex-1 p-4 md:px-6 overflow-y-auto flex flex-col gap-3 max-h-[400px]">
-              <div className="text-center text-[10px] text-line py-1">Today, Transfusion Match Dispatched</div>
-              {(activeThread?.messages || []).map((m) => {
-                if (m.sender === "system") {
-                  return (
-                    <div key={m.id} className="text-center my-1">
-                      <span className="inline-block px-3.5 py-1 rounded-full bg-card text-[11px] text-muted border border-cardtop/40">
-                        {m.text} • {m.time}
-                      </span>
-                    </div>
-                  );
-                }
-                const outgoing = m.sender === "recipient";
-                return (
-                  <div key={m.id} className={`flex flex-col ${outgoing ? "items-end" : "items-start"}`}>
-                    <div className="text-[10px] text-line mb-1">
-                      {m.time} • {m.label}
-                    </div>
-                    <div
-                      className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
-                        outgoing
-                          ? "bg-peach text-[#3b1f12] font-medium rounded-br-sm"
-                          : "bg-card text-text border border-cardtop/50 rounded-bl-sm"
-                      }`}
+                    <button
+                      onClick={() =>
+                        setModal({
+                          eyebrow: "COMMUNITY SAFEGUARD",
+                          title: "Report Safety Concern",
+                          body: (
+                            <div className="flex flex-col gap-3">
+                              <p>Select a category and provide clear evidence. 3 independent reports trigger an automatic 7-day restriction on creating new emergency requests.</p>
+                              <select defaultValue={reportCategory} onChange={(e) => setReportCategory(e.target.value)} className="input-pill bg-surface">
+                                <option value="FALSE_DONOR_INFO">False Donor Information</option>
+                                <option value="HARASSMENT">Harassment</option>
+                                <option value="INAPPROPRIATE_CONTENT">Inappropriate Content</option>
+                                <option value="SUSPICIOUS_ACTIVITY">Suspicious Activity</option>
+                              </select>
+                              <textarea rows="3" defaultValue={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Describe what happened..." className="input-box" />
+                            </div>
+                          ),
+                          confirmLabel: "Submit Confidential Report",
+                          onConfirm: () =>
+                            submitSafetyReport({
+                              targetUserId: activeConv.partner?.id,
+                              category: reportCategory,
+                              reason: reportReason.trim().length >= 10 ? reportReason.trim() : "Safety concern reported via chat.",
+                            }),
+                        })
+                      }
+                      className="px-2.5 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] text-muted cursor-pointer"
                     >
-                      {m.text}
-                    </div>
-                    {outgoing && m.delivered && (
-                      <div className="text-[10px] text-line mt-1">Delivered ✔</div>
+                      âš‘ Report
+                    </button>
+                    {activeConv.restrictedById === user.id && (
+                      <button onClick={() => handleRestrict(activeConv.id, "remove")} className="px-3 py-1.5 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-amber-400 cursor-pointer">Remove Restriction</button>
+                    )}
+                    {!activeConv.restrictedById && !activeConv.requiresReinvite && (
+                      <button onClick={() => handleRestrict(activeConv.id, "apply")} className="px-3 py-1.5 rounded-full bg-card hover:bg-danger/20 text-[11px] font-semibold text-danger cursor-pointer">Restrict</button>
                     )}
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Quick Action Chips */}
-            <div className="px-4 py-2 border-t border-cardtop/40 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="text-line font-semibold">QUICK REPLIES:</span>
-              {[
-                "I'm waiting at 1st Floor Lab",
-                "Coordinator is informed",
-                "Need urgent arrival ETA",
-              ].map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => handleQuickChip(chip)}
-                  className="px-3 py-1 rounded-full bg-card hover:bg-cardhigh text-muted hover:text-text border border-cardtop/50 cursor-pointer"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-
-            {/* Input Form */}
-            <form onSubmit={handleSend} className="p-4 border-t border-cardtop/50 flex items-center gap-2 bg-card/40">
-              <button
-                type="button"
-                onClick={() => handleQuickChip("📍 Shared Mayo Hospital Gate 3 Meeting Pin")}
-                className="w-10 h-10 rounded-full bg-card hover:bg-cardhigh text-muted flex items-center justify-center cursor-pointer"
-                title="Share Meeting Pin"
-              >
-                📍
-              </button>
-              <input
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={`Type a secure message to ${activeDonor?.name}...`}
-                className="input-pill flex-1 h-11"
-              />
-              <button type="submit" className="btn btn-primary py-2.5 px-5 text-[13px]">
-                Send ➤
-              </button>
-            </form>
+                </div>
+                {(activeConv.restrictedById || activeConv.requiresReinvite) && (
+                  <div className="mx-4 mt-3 p-3 rounded-2xl bg-danger/10 border border-danger/30 text-[12px] text-danger">
+                    {activeConv.restrictedById
+                      ? "ðŸš« This conversation is restricted. Messages and invitations are blocked."
+                      : "âš  Restriction was removed. A new chat invitation must be accepted before messaging can resume."}
+                  </div>
+                )}
+                <div ref={feedRef} className="flex-1 p-4 md:px-6 overflow-y-auto flex flex-col gap-3 max-h-[400px]">
+                  {convMessages.length === 0 && <div className="text-center text-[12px] text-muted py-6">No messages yet. Send the first message!</div>}
+                  {convMessages.map((m) => {
+                    const outgoing = m.senderId === user.id;
+                    return (
+                      <div key={m.id} className={`flex flex-col ${outgoing ? "items-end" : "items-start"}`}>
+                        <div className="text-[10px] text-line mb-1">
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} â€¢ {m.senderName || "You"}
+                        </div>
+                        <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
+                          outgoing ? "bg-peach text-[#3b1f12] font-medium rounded-br-sm" : "bg-card text-text border border-cardtop/50 rounded-bl-sm"
+                        }`}>
+                          {m.text}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!activeConv.restrictedById && !activeConv.requiresReinvite && (
+                  <form onSubmit={handleSend} className="p-4 border-t border-cardtop/50 flex items-center gap-2 bg-card/40">
+                    <input type="text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Message ${activeConv.partner?.name || "partner"}... (max 1000 chars)`} maxLength={1000} className="input-pill flex-1 h-11" />
+                    <span className="text-[10px] text-line shrink-0">{draft.length}/1000</span>
+                    <button type="submit" className="btn btn-primary py-2.5 px-5 text-[13px]">Send âž¤</button>
+                  </form>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-muted text-[13px]">Select a conversation to start messaging.</div>
+            )}
           </section>
-
-          {/* Column 3: Live Case Dossier */}
-          <aside className="lg:col-span-3 bg-cardlow rounded-3xl p-4 border border-cardtop/50 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-text text-[15px]">📋 Case Summary</h3>
-              <span className="px-2 py-0.5 rounded bg-danger text-[#250a11] text-[10px] font-bold">CRITICAL</span>
-            </div>
-
-            <div className="bg-card rounded-2xl p-4 border border-cardtop/50 flex flex-col gap-3">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-line">REQUEST ID</span>
-                <span className="text-text font-bold">#{activeReq?.id}</span>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <div className="text-[10px] text-line">Required Group</div>
-                  <div className="text-2xl font-bold text-primary">{activeReq?.blood}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-line">Units</div>
-                  <div className="text-lg font-bold text-text">{activeReq?.units} Bags</div>
-                </div>
-              </div>
-              <div className="text-[12px] text-muted border-t border-cardtop/40 pt-2">
-                <div className="font-semibold text-text">🏥 {activeReq?.hospital}</div>
-                <div className="text-[11px]">{activeReq?.ward}</div>
-                <div className="text-[11px] mt-1">Attendant: {activeReq?.attendant}</div>
-              </div>
-              <div className="flex items-center justify-between bg-deep rounded-xl px-3 py-2 text-[11px]">
-                <span className="text-emerald-400">● Cross-match Lab Ready</span>
-                <span className="text-text font-semibold">Slip {activeReq?.slipNumber}</span>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-2xl p-4 border border-cardtop/50 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-line uppercase">DONOR CREDENTIAL</span>
-                <span className="text-emerald-400 font-semibold">● Active Donor</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-deep rounded-xl p-2.5">
-                  <div className="text-[10px] text-line">Past Donations</div>
-                  <div className="text-[14px] font-bold text-text">{activeDonor?.times} Times</div>
-                </div>
-                <div className="bg-deep rounded-xl p-2.5">
-                  <div className="text-[10px] text-line">Last Donated</div>
-                  <div className="text-[14px] font-bold text-text">{activeDonor?.lastDays} Days</div>
-                </div>
-              </div>
-              <div className="text-[11px] text-muted">
-                Honor Score: <strong className="text-primary">{activeDonor?.honorScore}% Fulfillment</strong>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-line uppercase">MEETING POINT</span>
-                <span className="text-primary">Map View</span>
-              </div>
-              <LahoreMapPreview
-                title="Transfusion Window 3"
-                subtitle="Gate 3"
-                pinLabel="Mayo Lab 1F"
-                heightClass="h-32"
-              />
-            </div>
-
-            <button
-              onClick={() => setSafetyOpen((v) => !v)}
-              className="text-left p-3 rounded-2xl bg-card hover:bg-cardhigh text-[12px] text-muted border border-cardtop/40 cursor-pointer"
-            >
-              <div className="flex justify-between font-semibold text-text">
-                <span>🛡 Safety Guidelines Reminder</span>
-                <span>{safetyOpen ? "−" : "+"}</span>
-              </div>
-              {safetyOpen && (
-                <p className="mt-2 text-[11px] text-muted">
-                  Never exchange money or share personal phone numbers before hospital check-in. Confirm lab slip {activeReq?.slipNumber} at Window 3.
-                </p>
-              )}
-            </button>
-          </aside>
         </div>
       </div>
     );
@@ -477,10 +364,10 @@ window.LifeLinkAccountPages = (() => {
           <aside className="lg:col-span-3 flex flex-col gap-4 lg:sticky lg:top-24">
             <div className="bg-cardlow rounded-3xl p-3 border border-cardtop/50 flex flex-col gap-1">
               {[
-                { id: "profile", label: "👤 Profile & Blood Group" },
-                { id: "availability", label: "⚡ Donor Availability" },
-                { id: "privacy", label: "🛡 Privacy & Safety" },
-                { id: "security", label: "🔑 Account Security" },
+                { id: "profile", label: "ðŸ‘¤ Profile & Blood Group" },
+                { id: "availability", label: "âš¡ Donor Availability" },
+                { id: "privacy", label: "ðŸ›¡ Privacy & Safety" },
+                { id: "security", label: "ðŸ”‘ Account Security" },
               ].map((nav) => (
                 <button
                   key={nav.id}
@@ -500,7 +387,7 @@ window.LifeLinkAccountPages = (() => {
 
             <div className="bg-cardlow rounded-3xl p-5 border border-cardtop/50">
               <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                ✔ DONOR CREDIBILITY
+                âœ” DONOR CREDIBILITY
               </div>
               <p className="text-[12px] text-muted mt-2">
                 {form.safetyFlags} flags reported across historical donor inquiries in the {form.city} region.
@@ -598,7 +485,7 @@ window.LifeLinkAccountPages = (() => {
                   <h2 className="text-xl font-bold text-text">Donor Availability Controls</h2>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold">
-                  ● Status: {form.available ? "Fresh (Active within 7 days)" : "Paused"}
+                  â— Status: {form.available ? "Fresh (Active within 7 days)" : "Paused"}
                 </span>
               </div>
 
@@ -623,7 +510,7 @@ window.LifeLinkAccountPages = (() => {
 
               <div className="bg-deep rounded-2xl p-4 border border-cardtop/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-[12px] text-muted">
-                  <strong className="text-text">7-Day Freshness Assurance Rule:</strong> Profiles inactive for &gt;7 days display as “May be outdated”.
+                  <strong className="text-text">7-Day Freshness Assurance Rule:</strong> Profiles inactive for &gt;7 days display as â€œMay be outdatedâ€.
                 </div>
                 <button
                   onClick={() => {
@@ -632,7 +519,7 @@ window.LifeLinkAccountPages = (() => {
                   }}
                   className="px-4 py-2 rounded-full bg-card hover:bg-cardhigh text-primary text-[12px] font-semibold shrink-0 cursor-pointer"
                 >
-                  ↻ Refresh Timestamp Now
+                  â†» Refresh Timestamp Now
                 </button>
               </div>
             </section>
@@ -731,7 +618,7 @@ window.LifeLinkAccountPages = (() => {
 
               <div className="bg-danger/10 border border-danger/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="font-bold text-danger text-[14px]">⚠ Permanent Account Deletion</div>
+                  <div className="font-bold text-danger text-[14px]">âš  Permanent Account Deletion</div>
                   <p className="text-[12px] text-muted mt-1">
                     Deleting your account unpublishes your blood record immediately. Anonymized safety logs remain archived for 30 days.
                   </p>
@@ -758,13 +645,13 @@ window.LifeLinkAccountPages = (() => {
         {/* Sticky Action Footer Bar */}
         <div className="fixed bottom-5 inset-x-0 z-40 px-5 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto bg-cardhigh/95 backdrop-blur-xl rounded-full px-6 py-3 shadow-2xl border border-cardtop flex items-center justify-between gap-4">
-            <span className="text-[12px] text-muted">● Settings synced with secure cloud.</span>
+            <span className="text-[12px] text-muted">â— Settings synced with secure cloud.</span>
             <div className="flex items-center gap-3">
               <button onClick={discardChanges} className="text-[13px] text-muted hover:text-text cursor-pointer">
                 Discard
               </button>
               <button onClick={saveChanges} className="btn btn-primary py-2 px-6 text-[13px]">
-                ✔ Save Changes
+                âœ” Save Changes
               </button>
             </div>
           </div>
@@ -797,7 +684,7 @@ window.LifeLinkAccountPages = (() => {
             aria-label="Back to Home"
             className="hidden sm:flex absolute -left-14 top-6 w-10 h-10 rounded-full bg-cardlow border border-cardtop items-center justify-center text-muted hover:text-text cursor-pointer"
           >
-            ←
+            â†
           </button>
 
           <div className="bg-cardlow rounded-[32px] p-8 md:p-10 border border-cardtop/60 shadow-2xl flex flex-col gap-6">
@@ -885,7 +772,7 @@ window.LifeLinkAccountPages = (() => {
             </div>
 
             <p className="text-center text-[13px] text-muted">
-              Don’t have an account?{" "}
+              Donâ€™t have an account?{" "}
               <button
                 onClick={() => navigate("/signup")}
                 className="text-primary font-semibold hover:underline cursor-pointer"
@@ -933,7 +820,7 @@ window.LifeLinkAccountPages = (() => {
             aria-label="Back to Home"
             className="hidden sm:flex absolute -left-14 top-6 w-10 h-10 rounded-full bg-cardlow border border-cardtop items-center justify-center text-muted hover:text-text cursor-pointer"
           >
-            ←
+            â†
           </button>
 
           <div className="bg-cardlow rounded-[32px] p-8 md:p-10 border border-cardtop/60 shadow-2xl flex flex-col gap-5">
@@ -955,7 +842,7 @@ window.LifeLinkAccountPages = (() => {
                         : "bg-card border-cardtop text-muted"
                     }`}
                   >
-                    🤍 Voluntary Donor
+                    ðŸ¤ Voluntary Donor
                   </button>
                   <button
                     type="button"
@@ -966,7 +853,7 @@ window.LifeLinkAccountPages = (() => {
                         : "bg-card border-cardtop text-muted"
                     }`}
                   >
-                    👤 Recipient / Patient
+                    ðŸ‘¤ Recipient / Patient
                   </button>
                 </div>
               </div>
@@ -1041,7 +928,7 @@ window.LifeLinkAccountPages = (() => {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     className="input-pill"
                   />
                 </div>
@@ -1051,7 +938,7 @@ window.LifeLinkAccountPages = (() => {
                     type="password"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     className="input-pill"
                   />
                 </div>

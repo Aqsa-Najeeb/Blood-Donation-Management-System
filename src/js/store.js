@@ -657,10 +657,11 @@ function AppProvider({ children, defaultRoute }) {
   const [donors, setDonors] = useState(saved?.donors || INITIAL_DONORS);
   const [requests, setRequests] = useState(saved?.requests || INITIAL_REQUESTS);
   const [donorAlerts, setDonorAlerts] = useState(saved?.donorAlerts || INITIAL_DONOR_ALERTS);
-  const [threads, setThreads] = useState(saved?.threads || INITIAL_THREADS);
+  const [conversations, setConversations] = useState([]);
+  const [chatInvitations, setChatInvitations] = useState({ received: [], sent: [] });
   const [selectedDonorIds, setSelectedDonorIds] = useState(saved?.selectedDonorIds || [1, 2]);
   const [activeRequestId, setActiveRequestId] = useState(saved?.activeRequestId || "BR-9402");
-  const [activeThreadId, setActiveThreadId] = useState(saved?.activeThreadId || "thread-1");
+  const [activeConversationId, setActiveConversationId] = useState(null);
   const [activeDonorProfileId, setActiveDonorProfileId] = useState(saved?.activeDonorProfileId || 1);
   const [notifications, setNotifications] = useState([]);
   const [toast, setToast] = useState(null);
@@ -681,36 +682,20 @@ function AppProvider({ children, defaultRoute }) {
 
         if (localStorage.getItem(TOKEN_KEY)) {
           try {
-            const [me, reqsRes, chatsRes] = await Promise.all([
+            const [me, reqsRes, chatsRes, invitesRes] = await Promise.all([
               apiFetch("/api/auth/me"),
               apiFetch("/api/requests"),
               apiFetch("/api/chats"),
+              apiFetch("/api/chats/invitations"),
             ]);
             if (!active) return;
             if (me.user) setUser((prev) => mapApiUser(me.user, prev));
             if (reqsRes.requests?.length) setRequests(reqsRes.requests.map(mapApiRequest));
-            if (chatsRes.threads?.length) {
-              setThreads(
-                chatsRes.threads.map((t) => ({
-                  id: String(t.id),
-                  dbId: t.id,
-                  donorId: t.donorId,
-                  requestId: t.request?.code || String(t.requestId),
-                  hospital: t.hospital,
-                  lastTime: "Synced",
-                  statusTag: t.statusTag,
-                  unread: 0,
-                  archived: t.archived,
-                  messages: (t.messages || []).map((m) => ({
-                    id: String(m.id),
-                    sender: String(m.senderRole || "RECIPIENT").toLowerCase(),
-                    time: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    label: m.senderRole === "RECIPIENT" ? "You (Attendant)" : t.donor?.name || "Donor",
-                    text: m.text,
-                    delivered: m.delivered,
-                  })),
-                }))
-              );
+            if (chatsRes.conversations?.length) {
+              setConversations(chatsRes.conversations);
+            }
+            if (invitesRes) {
+              setChatInvitations({ received: invitesRes.received || [], sent: invitesRes.sent || [] });
             }
           } catch {
             localStorage.removeItem(TOKEN_KEY);
@@ -1029,69 +1014,41 @@ function AppProvider({ children, defaultRoute }) {
     showToast("Marked as donated! Hospital lab confirmation logged.");
   };
 
-  const sendMessage = (threadId, text, sender = "recipient") => {
+  const sendMessage = async (conversationId, text) => {
     if (!text.trim()) return;
-    const thread = threads.find((t) => t.id === threadId);
-    if (apiConnected && thread?.dbId) {
-      apiFetch(`/api/chats/${thread.dbId}/messages`, {
+    try {
+      await apiFetch(`/api/chats/${conversationId}/messages`, {
         method: "POST",
-        body: JSON.stringify({ text: text.trim(), senderRole: sender.toUpperCase() }),
-      }).catch(() => {});
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      showToast("Message sent.");
+    } catch (err) {
+      showToast(err.message, "warn");
     }
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === threadId
-          ? {
-              ...t,
-              lastTime: "Just now",
-              unread: 0,
-              messages: [
-                ...t.messages,
-                {
-                  id: "msg-" + Date.now(),
-                  sender,
-                  time: timeStr,
-                  label: sender === "recipient" ? "You (Attendant)" : "Donor",
-                  text: text.trim(),
-                  delivered: true,
-                },
-              ],
-            }
-          : t
-      )
-    );
   };
 
-  const openChatWithDonor = (donorId) => {
-    const existing = threads.find((t) => t.donorId === donorId);
-    if (existing) {
-      setActiveThreadId(existing.id);
-    } else {
-      const donor = donors.find((d) => d.id === donorId);
-      const newThread = {
-        id: `thread-${donorId}-${Date.now()}`,
-        donorId,
-        requestId: activeRequestId,
-        hospital: "Mayo Hospital (Transfusion Lab 1F)",
-        lastTime: "Just now",
-        statusTag: "Encrypted Relay",
-        unread: 0,
-        archived: false,
-        messages: [
-          {
-            id: `msg-${Date.now()}`,
-            sender: "system",
-            time: "Now",
-            text: `Encrypted relay opened with ${donor?.name || "Donor"}. Phone numbers remain shielded.`,
-          },
-        ],
-      };
-      setThreads((prev) => [newThread, ...prev]);
-      setActiveThreadId(newThread.id);
+  const openChatWithDonor = async (recipientId) => {
+    // Check if a conversation already exists with this user
+    try {
+      const chatsRes = await apiFetch("/api/chats");
+      const existing = (chatsRes.conversations || []).find(
+        (c) => c.partner?.id === recipientId
+      );
+      if (existing) {
+        setActiveConversationId(existing.id);
+        navigate("/chat");
+        return;
+      }
+      // Otherwise send an invitation
+      await apiFetch("/api/chats/invitations", {
+        method: "POST",
+        body: JSON.stringify({ recipientId }),
+      });
+      showToast("Chat invitation sent.");
+      navigate("/chat");
+    } catch (err) {
+      showToast(err.message, "warn");
     }
-    navigate("/chat");
   };
 
   const openDonorProfile = (donorId) => {
@@ -1394,10 +1351,11 @@ function AppProvider({ children, defaultRoute }) {
     setDonors(INITIAL_DONORS);
     setRequests(INITIAL_REQUESTS);
     setDonorAlerts(INITIAL_DONOR_ALERTS);
-    setThreads(INITIAL_THREADS);
+    setConversations([]);
+    setChatInvitations({ received: [], sent: [] });
     setSelectedDonorIds([1, 2]);
     setActiveRequestId("BR-9402");
-    setActiveThreadId("thread-1");
+    setActiveConversationId(null);
     setActiveDonorProfileId(1);
     showToast("Demo data reset to defaults.", "info");
   };
@@ -1416,16 +1374,18 @@ function AppProvider({ children, defaultRoute }) {
         requests,
         setRequests,
         donorAlerts,
-        threads,
-        setThreads,
+        conversations,
+        setConversations,
+        chatInvitations,
+        setChatInvitations,
         selectedDonorIds,
         setSelectedDonorIds,
         toggleSelectDonor,
         sendRequestsToSelected,
         activeRequestId,
         setActiveRequestId,
-        activeThreadId,
-        setActiveThreadId,
+        activeConversationId,
+        setActiveConversationId,
         activeDonorProfileId,
         setActiveDonorProfileId,
         createBloodRequest,

@@ -4,7 +4,7 @@
   const WRAP = "max-w-[1440px] mx-auto px-5 md:px-12";
 
   function SearchDonorsPage() {
-    const { user, navigate, showToast, searchDonors, contactDonor } = useApp();
+    const { user, navigate, showToast, searchDonors, contactDonor, openChatWithDonor } = useApp();
 
     const [locations, setLocations] = useState([
       { city: "Lahore", area: "Model Town" },
@@ -214,7 +214,7 @@
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-cardtop/40">
+                <div className="pt-2 border-t border-cardtop/40 flex flex-col gap-2">
                   {revealedPhones[d.id] ? (
                     <div className="bg-card rounded-2xl px-4 py-2.5 text-[13px] font-semibold text-primary">
                       Phone: {revealedPhones[d.id]}
@@ -226,6 +226,15 @@
                       className="w-full py-2.5 rounded-full bg-peach text-[#633e2a] text-[13px] font-semibold hover:bg-primary transition cursor-pointer"
                     >
                       Contact
+                    </button>
+                  )}
+                  {d.id !== user.id && (
+                    <button
+                      type="button"
+                      onClick={() => openChatWithDonor(d.id)}
+                      className="w-full py-2 rounded-full bg-card hover:bg-cardhigh text-text text-[12px] font-semibold border border-cardtop transition cursor-pointer"
+                    >
+                      Message
                     </button>
                   )}
                 </div>

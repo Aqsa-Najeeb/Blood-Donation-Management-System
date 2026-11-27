@@ -36,10 +36,11 @@ enum RequesterDecisionStatus {
   REJECTED
 }
 
-enum SenderRole {
-  DONOR
-  RECIPIENT
-  SYSTEM
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  RESTRICTED
 }
 
 enum ReportCategory {
@@ -78,9 +79,12 @@ model User {
 
   createdRequests      BloodRequest[]      @relation("RequesterRequests")
   responses            RequestResponse[]   @relation("DonorResponses")
-  donorThreads         ChatThread[]        @relation("DonorThreads")
-  recipientThreads     ChatThread[]        @relation("RecipientThreads")
-  sentMessages         ChatMessage[]
+  sentInvitations      ChatInvitation[]      @relation("SentInvitations")
+  receivedInvitations  ChatInvitation[]      @relation("ReceivedInvitations")
+  conversationsAsA     Conversation[]        @relation("ConversationsAsA")
+  conversationsAsB     Conversation[]        @relation("ConversationsAsB")
+  restrictedConvs      Conversation[]        @relation("ConversationRestrictions")
+  sentConvMessages     ConversationMessage[] @relation("SentMessages")
   notifications        Notification[]
   reportsFiled         SafetyReport[]      @relation("ReporterReports")
   reportsReceived      SafetyReport[]      @relation("TargetReports")
@@ -111,7 +115,6 @@ model BloodRequest {
 
   requester User              @relation("RequesterRequests", fields: [requesterId], references: [id], onDelete: Cascade)
   responses RequestResponse[]
-  threads   ChatThread[]
 
   @@index([status, bloodGroup])
   @@index([requesterId])
@@ -138,42 +141,55 @@ model RequestResponse {
   @@map("request_responses")
 }
 
-model ChatThread {
-  id          Int      @id @default(autoincrement())
-  requestId   Int
-  donorId     Int
+model ChatInvitation {
+  id          Int              @id @default(autoincrement())
+  senderId    Int
   recipientId Int
-  hospital    String   @db.VarChar(160)
-  statusTag   String   @default("Relay") @db.VarChar(60)
-  archived    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      InvitationStatus @default(PENDING)
+  rejectedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  request   BloodRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  donor     User          @relation("DonorThreads", fields: [donorId], references: [id], onDelete: Cascade)
-  recipient User          @relation("RecipientThreads", fields: [recipientId], references: [id], onDelete: Cascade)
-  messages  ChatMessage[]
+  sender    User @relation("SentInvitations",     fields: [senderId],    references: [id], onDelete: Cascade)
+  recipient User @relation("ReceivedInvitations", fields: [recipientId], references: [id], onDelete: Cascade)
 
-  @@unique([requestId, donorId])
-  @@index([recipientId])
-  @@index([donorId])
-  @@map("chat_threads")
+  @@unique([senderId, recipientId])
+  @@index([recipientId, status])
+  @@map("chat_invitations")
 }
 
-model ChatMessage {
-  id         Int        @id @default(autoincrement())
-  threadId   Int
-  senderId   Int?
-  senderRole SenderRole
-  text       String     @db.Text
-  delivered  Boolean    @default(true)
-  createdAt  DateTime   @default(now())
+model Conversation {
+  id               Int      @id @default(autoincrement())
+  userAId          Int
+  userBId          Int
+  restrictedById   Int?
+  requiresReinvite Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  sender User?      @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  userA      User                  @relation("ConversationsAsA",      fields: [userAId],        references: [id], onDelete: Cascade)
+  userB      User                  @relation("ConversationsAsB",      fields: [userBId],        references: [id], onDelete: Cascade)
+  restrictor User?                 @relation("ConversationRestrictions", fields: [restrictedById], references: [id], onDelete: SetNull)
+  messages   ConversationMessage[]
 
-  @@index([threadId, createdAt])
-  @@map("chat_messages")
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  text           String   @db.VarChar(1000)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
 }
 
 model Notification {

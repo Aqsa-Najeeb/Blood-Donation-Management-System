@@ -13,8 +13,9 @@ function getTestPrisma() {
 async function resetTestDb(prisma) {
   await prisma.safetyReport.deleteMany();
   await prisma.notification.deleteMany();
-  await prisma.chatMessage.deleteMany();
-  await prisma.chatThread.deleteMany();
+  await prisma.conversationMessage.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.chatInvitation.deleteMany();
   await prisma.requestResponse.deleteMany();
   await prisma.bloodRequest.deleteMany();
   await prisma.user.deleteMany();
