@@ -109,7 +109,6 @@ window.LifeLinkComponents = (() => {
                 onClick={() => {
                   setNotifOpen((v) => !v);
                   setProfileOpen(false);
-                  markNotificationsRead();
                 }}
                 aria-label="Notifications"
                 className="w-9 h-9 rounded-full bg-primary/90 hover:bg-primary flex items-center justify-center relative transition cursor-pointer"
@@ -125,29 +124,49 @@ window.LifeLinkComponents = (() => {
               {notifOpen && (
                 <div className="absolute right-0 mt-3 w-80 bg-cardlow border border-cardtop rounded-3xl p-4 shadow-2xl z-50">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-[13px] font-bold text-text">Dispatch Notifications</span>
-                    <button
-                      onClick={() => setNotifOpen(false)}
-                      className="text-[11px] text-line hover:text-text cursor-pointer"
-                    >
-                      Close
-                    </button>
+                    <span className="text-[13px] font-bold text-text">
+                      Unread Notifications ({unreadCount})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={() => markNotificationsRead()}
+                          className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setNotifOpen(false)}
+                        className="text-[11px] text-line hover:text-text cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
-                    {notifications.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => {
-                          setNotifOpen(false);
-                          navigate(n.route);
-                        }}
-                        className="text-left p-3 rounded-2xl bg-card hover:bg-cardhigh transition cursor-pointer"
-                      >
-                        <div className="text-[12px] font-semibold text-text">{n.title}</div>
-                        <div className="text-[11px] text-muted mt-0.5">{n.desc}</div>
-                        <div className="text-[10px] text-primary mt-1">{n.time}</div>
-                      </button>
-                    ))}
+                    {notifications.length === 0 ? (
+                      <div className="p-3 rounded-2xl bg-card text-[12px] text-muted text-center">
+                        No unread notifications.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            setNotifOpen(false);
+                            navigate(n.route || "/requests");
+                          }}
+                          className="text-left p-3 rounded-2xl bg-card hover:bg-cardhigh transition cursor-pointer"
+                        >
+                          <div className="text-[12px] font-semibold text-text">{n.title}</div>
+                          <div className="text-[11px] text-muted mt-0.5">{n.description || n.desc}</div>
+                          <div className="text-[10px] text-primary mt-1">
+                            {n.createdAt ? new Date(n.createdAt).toLocaleString() : n.time}
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

@@ -60,19 +60,21 @@ async function expireDueRequests(prisma) {
     expiredCount += 1;
 
     await notify(req.requesterId, {
-      type: "REQUEST_EXPIRED",
+      type: "REQUEST_CLOSED",
+      reference: `${req.code}:EXPIRED`,
       title: `Request ${req.code} expired`,
       text: `Your ${req.bloodGroup} blood request at ${req.hospital} expired at 11:59 PM PKT.`,
-      link: `/request-track?id=${req.code}`,
+      link: "/requests",
     });
 
     const notifiedDonorIds = [...new Set((req.responses || []).map((r) => r.donorId))];
     for (const donorId of notifiedDonorIds) {
       await notify(donorId, {
-        type: "REQUEST_EXPIRED",
+        type: "REQUEST_CLOSED",
+        reference: `${req.code}:EXPIRED`,
         title: `Request ${req.code} expired`,
         text: `The ${req.bloodGroup} blood request at ${req.hospital} has expired and is now closed.`,
-        link: `/request-track?id=${req.code}`,
+        link: "/requests",
       });
     }
   }

@@ -662,26 +662,7 @@ function AppProvider({ children, defaultRoute }) {
   const [activeRequestId, setActiveRequestId] = useState(saved?.activeRequestId || "BR-9402");
   const [activeThreadId, setActiveThreadId] = useState(saved?.activeThreadId || "thread-1");
   const [activeDonorProfileId, setActiveDonorProfileId] = useState(saved?.activeDonorProfileId || 1);
-  const [notifications, setNotifications] = useState(
-    saved?.notifications || [
-      {
-        id: "n1",
-        title: "Hamza Tariq arrived at Mayo Hospital",
-        desc: "Request #BR-9402 • Heading to Transfusion Window 3",
-        time: "2m ago",
-        route: "/chat",
-        unread: true,
-      },
-      {
-        id: "n2",
-        title: "2 Units O+ Urgent Alert nearby",
-        desc: "Mayo Hospital ICU Ward 2 • ~4.1 km away",
-        time: "18m ago",
-        route: "/donor-dashboard",
-        unread: true,
-      },
-    ]
-  );
+  const [notifications, setNotifications] = useState([]);
   const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null);
 
@@ -774,16 +755,41 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
-  const pushNotification = (title, desc, route = "/donor-dashboard") => {
-    setNotifications((prev) => [
-      { id: "n-" + Date.now(), title, desc, time: "Just now", route, unread: true },
-      ...prev.slice(0, 7),
-    ]);
+  const fetchNotifications = async () => {
+    if (!localStorage.getItem(TOKEN_KEY)) return;
+    try {
+      const res = await apiFetch("/api/notifications");
+      if (Array.isArray(res.notifications)) {
+        setNotifications(res.notifications);
+      }
+    } catch {
+      // Ignore transient poll failures
+    }
   };
 
-  const markNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    if (apiConnected) apiFetch("/api/notifications/read", { method: "POST" }).catch(() => {});
+  useEffect(() => {
+    if (!user.loggedIn) {
+      setNotifications([]);
+      return;
+    }
+    fetchNotifications();
+    const timer = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(timer);
+  }, [user.loggedIn]);
+
+  const pushNotification = () => {
+    // Removed local/chat notification injection; notifications are server-driven only (C1).
+  };
+
+  const markNotificationsRead = async () => {
+    setNotifications([]);
+    if (localStorage.getItem(TOKEN_KEY)) {
+      try {
+        await apiFetch("/api/notifications/read", { method: "POST" });
+      } catch {
+        // Ignore
+      }
+    }
   };
 
   const toggleSelectDonor = (donorId) => {

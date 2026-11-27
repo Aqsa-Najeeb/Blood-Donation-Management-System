@@ -9,8 +9,10 @@ const createRequestsRouter = require("./routes/requests");
 const createDonorActionsRouter = require("./routes/donorActions");
 const createChatsRouter = require("./routes/chats");
 const createSettingsRouter = require("./routes/settings");
+const { setNotificationPrisma } = require("./modules/notifications");
 
 function createApp(prisma, { skipRateLimiters = false } = {}) {
+  setNotificationPrisma(prisma);
   const app = express();
   const srcDir = path.resolve(__dirname, "..", "src");
 

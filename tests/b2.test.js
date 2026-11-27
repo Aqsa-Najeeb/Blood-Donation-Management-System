@@ -136,7 +136,7 @@ describe("Slice B2 — Donor responses & guards", () => {
       .send({ donorResponse: "ACCEPTED" });
     assert.equal(r1.status, 200);
     assert.equal(r1.body.request.responses[0].donorResponse, "ACCEPTED");
-    assert.ok(notifyCalls.some((c) => c.userId === owner.user.id && c.type === "DONOR_RESPONDED"));
+    assert.ok(notifyCalls.some((c) => c.userId === owner.user.id && c.type === "RESPONSE_RECEIVED"));
 
     const r2 = await request(app)
       .patch(`/api/requests/${reqId}/respond`)
@@ -230,7 +230,7 @@ describe("Slice B2 — Requester decisions, contact visibility & closed readabil
       .set("Authorization", `Bearer ${owner.token}`)
       .send({ requesterDecision: "APPROVED" });
     assert.equal(approveRes.status, 200);
-    assert.ok(notifyCalls.some((c) => c.userId === donor1.user.id && c.type === "REQUESTER_DECISION"));
+    assert.ok(notifyCalls.some((c) => c.userId === donor1.user.id && c.type === "RESPONSE_DECISION"));
 
     // Donor1 sees contactPhone
     const afterDetail1 = await request(app)

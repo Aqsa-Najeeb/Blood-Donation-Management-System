@@ -179,14 +179,17 @@ model ChatMessage {
 model Notification {
   id          Int      @id @default(autoincrement())
   userId      Int
+  type        String   @default("REQUEST_MATCH") @db.VarChar(40)
+  reference   String   @default("") @db.VarChar(120)
   title       String   @db.VarChar(160)
   description String   @db.VarChar(255)
-  route       String   @default("/donor-dashboard") @db.VarChar(80)
+  route       String   @default("/requests") @db.VarChar(80)
   unread      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, type, reference])
   @@index([userId, unread])
   @@map("notifications")
 }

@@ -266,10 +266,11 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
 
         for (const m of matches) {
           await notify(m.donor.id, {
-            type: "EMERGENCY_REQUEST",
+            type: "REQUEST_MATCH",
+            reference: created.code,
             title: `${created.bloodGroup} blood request near ${created.area}`,
             text: `${created.units} unit(s) needed at ${created.hospital} (${created.urgency})`,
-            link: `/request-track?id=${created.code}`,
+            link: "/requests",
           });
         }
       }
@@ -333,10 +334,11 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
 
       // Notify the requester that a donor responded
       await notify(item.requesterId, {
-        type: "DONOR_RESPONDED",
+        type: "RESPONSE_RECEIVED",
+        reference: `${item.code}:donor:${viewer.id}:${newResponse}`,
         title: `Donor responded to ${item.code}`,
         text: `${viewer.name} has ${newResponse.toLowerCase()} your request (willing to be contacted).`,
-        link: `/request-track?id=${item.code}`,
+        link: "/requests",
       });
 
       const full = await findRequestByIdOrCode(item.id);
@@ -397,14 +399,15 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
 
       // Notify the donor about the requester's decision
       await notify(responseRow.donorId, {
-        type: "REQUESTER_DECISION",
+        type: "RESPONSE_DECISION",
+        reference: `${item.code}:decision:${newDecision}`,
         title: `Your response was ${newDecision.toLowerCase()}`,
         text: `The requester has ${newDecision.toLowerCase()} your response to ${item.code}. ${
           newDecision === "APPROVED"
             ? "You are now approved — the requester's contact details are visible."
             : "Thank you for being willing to help."
         }`,
-        link: `/request-track?id=${item.code}`,
+        link: "/requests",
       });
 
       const full = await findRequestByIdOrCode(item.id);
@@ -507,10 +510,11 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
         const notifiedDonorIds = [...new Set((item.responses || []).map((r) => r.donorId))];
         for (const donorId of notifiedDonorIds) {
           await notify(donorId, {
-            type: closureReason === "CANCELLED" ? "REQUEST_CANCELLED" : "REQUEST_FULFILLED",
+            type: "REQUEST_CLOSED",
+            reference: `${item.code}:${closureReason}`,
             title: `Request ${item.code} ${actionLabel}`,
             text: `The ${item.bloodGroup} blood request at ${item.hospital} has been ${actionLabel} by the requester.`,
-            link: `/request-track?id=${item.code}`,
+            link: "/requests",
           });
         }
 

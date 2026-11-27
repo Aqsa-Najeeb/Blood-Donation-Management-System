@@ -440,10 +440,13 @@ describe("backend/utils/distance.js", () => {
   });
 });
 
-describe("backend/modules/notifications.js stub", () => {
-  it("notify() resolves without throwing", async () => {
+describe("backend/modules/notifications.js", () => {
+  it("notify() persists allowed notification types without throwing", async () => {
     const { notify } = require("../backend/modules/notifications");
-    await assert.doesNotReject(() => notify(1, { type: "TEST", title: "T", text: "Hello" }));
+    const u = await createTestUser(prisma);
+    await assert.doesNotReject(() =>
+      notify(u.id, { type: "REQUEST_MATCH", reference: "A1-TEST", title: "T", text: "Hello" })
+    );
   });
 });
 

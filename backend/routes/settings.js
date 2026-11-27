@@ -234,28 +234,28 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
     }
   });
 
-  // GET /api/notifications
+  // GET /api/notifications — signed-in user's UNREAD items only
   router.get("/notifications", requireAuth, async (req, res, next) => {
     try {
       const notifications = await prisma.notification.findMany({
-        where: { userId: req.user.id },
+        where: { userId: req.user.id, unread: true },
         orderBy: { createdAt: "desc" },
-        take: 15,
+        take: 25,
       });
-      return res.json({ notifications });
+      return res.json({ count: notifications.length, notifications });
     } catch (err) {
       return next(err);
     }
   });
 
-  // POST /api/notifications/read
+  // POST /api/notifications/read — marks only the caller's items as read
   router.post("/notifications/read", requireAuth, async (req, res, next) => {
     try {
-      await prisma.notification.updateMany({
-        where: { userId: req.user.id },
+      const result = await prisma.notification.updateMany({
+        where: { userId: req.user.id, unread: true },
         data: { unread: false },
       });
-      return res.json({ message: "Notifications marked as read." });
+      return res.json({ message: "Notifications marked as read.", updatedCount: result.count });
     } catch (err) {
       return next(err);
     }

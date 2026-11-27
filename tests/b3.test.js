@@ -117,8 +117,8 @@ describe("Slice B3 — Expiry BVA & Idempotency (FR-18, BR-11, BR-12, BR-23, D2)
     assert.equal(atBoundary.body.request.closureReason, "EXPIRED");
 
     // Owner and donor notified without contact details
-    const ownerNotifs = notifyCalls.filter((c) => c.userId === owner.user.id && c.type === "REQUEST_EXPIRED");
-    const donorNotifs = notifyCalls.filter((c) => c.userId === donor.user.id && c.type === "REQUEST_EXPIRED");
+    const ownerNotifs = notifyCalls.filter((c) => c.userId === owner.user.id && c.type === "REQUEST_CLOSED");
+    const donorNotifs = notifyCalls.filter((c) => c.userId === donor.user.id && c.type === "REQUEST_CLOSED");
     assert.equal(ownerNotifs.length, 1);
     assert.equal(donorNotifs.length, 1);
     for (const c of [...ownerNotifs, ...donorNotifs]) {
@@ -178,7 +178,7 @@ describe("Slice B3 — Cancel, Fulfil & Post-Closure Guards (FR-12, BR-10, D2)",
     assert.equal(cancelRes.body.request.closureReason, "CANCELLED");
 
     // Each previously notified donor receives exactly 1 closure notification without contact details
-    const donorNotifs = notifyCalls.filter((c) => c.userId === other.user.id && c.type === "REQUEST_CANCELLED");
+    const donorNotifs = notifyCalls.filter((c) => c.userId === other.user.id && c.type === "REQUEST_CLOSED");
     assert.equal(donorNotifs.length, 1);
     assert.ok(!donorNotifs[0].text.includes("7654321"));
 
@@ -273,8 +273,8 @@ describe("Slice B3 — Cancel, Fulfil & Post-Closure Guards (FR-12, BR-10, D2)",
     assert.equal(fulfilRes.body.request.closureReason, "FULFILLED");
 
     // Each notified donor gets exactly 1 notification without contact details
-    const d1Notifs = notifyCalls.filter((c) => c.userId === donor1.user.id && c.type === "REQUEST_FULFILLED");
-    const d2Notifs = notifyCalls.filter((c) => c.userId === donor2.user.id && c.type === "REQUEST_FULFILLED");
+    const d1Notifs = notifyCalls.filter((c) => c.userId === donor1.user.id && c.type === "REQUEST_CLOSED");
+    const d2Notifs = notifyCalls.filter((c) => c.userId === donor2.user.id && c.type === "REQUEST_CLOSED");
     assert.equal(d1Notifs.length, 1);
     assert.equal(d2Notifs.length, 1);
     assert.ok(!d1Notifs[0].text.includes("7654321"));
