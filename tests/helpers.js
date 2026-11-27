@@ -11,6 +11,7 @@ function getTestPrisma() {
 }
 
 async function resetTestDb(prisma) {
+  await prisma.restrictionRecord.deleteMany();
   await prisma.safetyReport.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.conversationMessage.deleteMany();

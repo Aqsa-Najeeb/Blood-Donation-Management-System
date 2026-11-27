@@ -88,6 +88,7 @@ model User {
   notifications        Notification[]
   reportsFiled         SafetyReport[]      @relation("ReporterReports")
   reportsReceived      SafetyReport[]      @relation("TargetReports")
+  restrictions         RestrictionRecord[] @relation("UserRestrictions")
 
   @@index([bloodGroup, available])
   @@index([city])
@@ -225,4 +226,18 @@ model SafetyReport {
   @@unique([targetUserId, reporterId])
   @@index([targetUserId])
   @@map("safety_reports")
+}
+
+model RestrictionRecord {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  reason    String   @db.Text
+  startsAt  DateTime
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation("UserRestrictions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("restriction_records")
 }

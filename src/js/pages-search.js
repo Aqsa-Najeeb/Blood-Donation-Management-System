@@ -4,7 +4,7 @@
   const WRAP = "max-w-[1440px] mx-auto px-5 md:px-12";
 
   function SearchDonorsPage() {
-    const { user, navigate, showToast, searchDonors, contactDonor, openChatWithDonor } = useApp();
+    const { user, navigate, showToast, searchDonors, contactDonor, openChatWithDonor, submitSafetyReport, setModal } = useApp();
 
     const [locations, setLocations] = useState([
       { city: "Lahore", area: "Model Town" },
@@ -229,13 +229,54 @@
                     </button>
                   )}
                   {d.id !== user.id && (
-                    <button
-                      type="button"
-                      onClick={() => openChatWithDonor(d.id)}
-                      className="w-full py-2 rounded-full bg-card hover:bg-cardhigh text-text text-[12px] font-semibold border border-cardtop transition cursor-pointer"
-                    >
-                      Message
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openChatWithDonor(d.id)}
+                        className="flex-1 py-2 rounded-full bg-card hover:bg-cardhigh text-text text-[12px] font-semibold border border-cardtop transition cursor-pointer"
+                      >
+                        Message
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          let cat = "SUSPICIOUS_ACTIVITY";
+                          let reason = "";
+                          setModal({
+                            eyebrow: "COMMUNITY SAFEGUARD",
+                            title: `Report ${d.name}`,
+                            body: (
+                              <div className="flex flex-col gap-3">
+                                <p className="text-[12px] text-muted">
+                                  Select a category and provide a reason of at least 10 characters. Reporter identity is kept private.
+                                </p>
+                                <select
+                                  defaultValue={cat}
+                                  onChange={(e) => { cat = e.target.value; }}
+                                  className="input-pill bg-surface"
+                                >
+                                  <option value="FALSE_DONOR_INFO">False Donor Information</option>
+                                  <option value="HARASSMENT">Harassment</option>
+                                  <option value="INAPPROPRIATE_CONTENT">Inappropriate Content</option>
+                                  <option value="SUSPICIOUS_ACTIVITY">Suspicious Activity</option>
+                                </select>
+                                <textarea
+                                  rows="3"
+                                  onChange={(e) => { reason = e.target.value; }}
+                                  placeholder="Describe the issue (at least 10 characters)..."
+                                  className="input-box"
+                                />
+                              </div>
+                            ),
+                            confirmLabel: "Submit Report",
+                            onConfirm: () => submitSafetyReport({ targetUserId: d.id, category: cat, reason }),
+                          });
+                        }}
+                        className="px-4 py-2 rounded-full bg-card hover:bg-danger/20 text-muted hover:text-danger text-[12px] font-semibold border border-cardtop transition cursor-pointer"
+                      >
+                        Report
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

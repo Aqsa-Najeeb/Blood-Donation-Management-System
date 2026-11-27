@@ -20,8 +20,6 @@ function sanitizeUser(user, { includePrivate = false } = {}) {
     replyLabel: user.replyLabel,
     donorIdCode: user.donorIdCode,
     matchingRadiusKm: user.matchingRadiusKm,
-    safetyFlags: user.safetyFlags,
-    restrictedUntil: user.restrictedUntil,
     lastAvailabilityUpdate: user.lastAvailabilityUpdate || null,
     deactivatedAt: user.deactivatedAt || null,
     createdAt: user.createdAt,
@@ -32,6 +30,8 @@ function sanitizeUser(user, { includePrivate = false } = {}) {
     base.email = user.email;
     base.phone = user.phone;
     base.strictPhoneShielding = user.strictPhoneShielding;
+    base.safetyFlags = user.safetyFlags;
+    base.restrictedUntil = user.restrictedUntil;
   } else {
     base.phone = isDeactivated ? null : user.phone ? maskPhone(user.phone) : null;
   }

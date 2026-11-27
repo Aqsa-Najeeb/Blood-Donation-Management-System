@@ -245,6 +245,12 @@ describe("Slice A2 — Account deletion & anonymisation (D8)", () => {
     assert.equal(searchBefore.status, 200);
     assert.ok(searchBefore.body.donors.some((d) => d.id === target.user.id));
 
+    // Age reporter account past 24 hours (required by C3 D7)
+    await prisma.user.update({
+      where: { id: reporter.user.id },
+      data: { createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+    });
+
     // Create a safety report referencing target
     const repRes = await request(app)
       .post("/api/reports")

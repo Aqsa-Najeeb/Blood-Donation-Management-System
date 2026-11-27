@@ -6,7 +6,7 @@ const { now } = require("../utils/clock");
 const { findLocation } = require("../data/locations");
 const { findMatchingDonors } = require("../modules/matching");
 const { notify } = require("../modules/notifications");
-const { isRestricted } = require("../modules/restrictions");
+const { isRestricted, getActiveRestriction } = require("../modules/restrictions");
 const { toPktDateString, expireDueRequests } = require("../modules/requestLifecycle");
 const {
   VALID_BLOOD_GROUPS,
@@ -142,9 +142,13 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
       }
 
       // Check restriction BEFORE creating (blocks ANY urgency)
-      if (await isRestricted(requester.id)) {
+      const activeRestriction = await getActiveRestriction(requester.id);
+      if (activeRestriction) {
+        const expiresIso = new Date(activeRestriction.expiresAt).toISOString();
         return res.status(403).json({
-          error: "Account is temporarily restricted from creating new emergency requests.",
+          error: `A precautionary restriction is active until ${expiresIso} (not a verified finding). You cannot create new emergency requests while it is active.`,
+          restrictedUntil: expiresIso,
+          precautionary: true,
         });
       }
 

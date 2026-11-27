@@ -167,6 +167,12 @@
         {/* Request Creation Form */}
         <section className="bg-cardlow rounded-3xl p-6 md:p-8 border border-cardtop/60 flex flex-col gap-5">
           <h2 className="text-xl font-bold text-text">Submit Emergency Blood Request</h2>
+          {user.restrictedUntil && new Date(user.restrictedUntil) > new Date() && (
+            <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-[13px]">
+              <strong>Precautionary Restriction Notice:</strong> Your account is temporarily restricted from creating new emergency requests until{" "}
+              <span className="font-semibold">{new Date(user.restrictedUntil).toLocaleString()}</span>. This is an automated precautionary measure and is not a verified finding. Search, responses, chat, and profile editing remain available.
+            </div>
+          )}
           {errorMsg && (
             <div className="p-3.5 rounded-2xl bg-danger/15 border border-danger/40 text-danger text-[13px]">
               {errorMsg}

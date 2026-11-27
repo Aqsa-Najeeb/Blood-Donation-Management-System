@@ -25,6 +25,7 @@ const PROTECTED_USER_FIELDS = [
 
 const REPORT_THRESHOLD = 3;
 const RESTRICTION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const REPORTER_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
 function createSettingsRouter(prisma, { reportLimiter } = {}) {
   const router = express.Router();
@@ -266,7 +267,16 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
     try {
       const body = req.body || {};
 
-      for (const forbidden of ["safetyFlags", "restrictedUntil", "duration", "durationDays", "count", "reporterId"]) {
+      for (const forbidden of [
+        "safetyFlags",
+        "restrictedUntil",
+        "duration",
+        "durationDays",
+        "count",
+        "reporterId",
+        "startsAt",
+        "expiresAt",
+      ]) {
         if (Object.prototype.hasOwnProperty.call(body, forbidden)) {
           return res.status(403).json({ error: `Forbidden: '${forbidden}' cannot be supplied by client.` });
         }
@@ -278,6 +288,20 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
       }
       if (targetId === req.user.id) {
         return res.status(400).json({ error: "You cannot report your own account." });
+      }
+
+      const currentNow = now();
+      const reporter = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!reporter || reporter.deactivatedAt) {
+        return res.status(401).json({ error: "Reporter account not found or deactivated." });
+      }
+
+      // Independent reporter rule (D7): reporter account must be older than 24 hours
+      const accountAgeMs = currentNow.getTime() - new Date(reporter.createdAt).getTime();
+      if (accountAgeMs < REPORTER_MIN_AGE_MS) {
+        return res.status(403).json({
+          error: "Your account must be older than 24 hours to submit a safety report.",
+        });
       }
 
       const category = normalizeReportCategory(body.category || "SUSPICIOUS_ACTIVITY");
@@ -297,7 +321,7 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
       const cleanEvidence = body.evidence ? sanitizeText(body.evidence, 1000) : null;
 
       const targetUser = await prisma.user.findUnique({ where: { id: targetId } });
-      if (!targetUser) {
+      if (!targetUser || targetUser.deactivatedAt) {
         return res.status(404).json({ error: "Reported user not found." });
       }
 
@@ -317,33 +341,58 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
           category,
           reason: cleanReason,
           evidence: cleanEvidence,
+          createdAt: currentNow,
         },
       });
 
-      const independentCount = await prisma.safetyReport.count({
-        where: { targetUserId: targetId },
+      const latestRestriction = await prisma.restrictionRecord.findFirst({
+        where: { userId: targetId },
+        orderBy: { startsAt: "desc" },
       });
 
-      const thresholdReached = independentCount >= REPORT_THRESHOLD;
-      const newRestrictedUntil = thresholdReached
-        ? new Date(now().getTime() + RESTRICTION_DURATION_MS)
-        : targetUser.restrictedUntil;
+      const alreadyActive =
+        latestRestriction && currentNow.getTime() < new Date(latestRestriction.expiresAt).getTime();
 
-      await prisma.user.update({
-        where: { id: targetId },
-        data: {
-          safetyFlags: independentCount,
-          ...(thresholdReached && (!targetUser.restrictedUntil || new Date(targetUser.restrictedUntil) <= now())
-            ? { restrictedUntil: newRestrictedUntil }
-            : {}),
+      const reportsSinceLastStart = await prisma.safetyReport.count({
+        where: {
+          targetUserId: targetId,
+          ...(latestRestriction ? { createdAt: { gt: latestRestriction.startsAt } } : {}),
         },
       });
+
+      let autoRestricted = Boolean(alreadyActive);
+      if (!alreadyActive && reportsSinceLastStart >= REPORT_THRESHOLD) {
+        const expiresAt = new Date(currentNow.getTime() + RESTRICTION_DURATION_MS);
+        await prisma.restrictionRecord.create({
+          data: {
+            userId: targetId,
+            reason:
+              "Automated precautionary restriction following 3 independent reports (not a verified finding).",
+            startsAt: currentNow,
+            expiresAt,
+            createdAt: currentNow,
+          },
+        });
+        await prisma.user.update({
+          where: { id: targetId },
+          data: {
+            safetyFlags: reportsSinceLastStart,
+            restrictedUntil: expiresAt,
+          },
+        });
+        autoRestricted = true;
+      } else {
+        await prisma.user.update({
+          where: { id: targetId },
+          data: { safetyFlags: reportsSinceLastStart },
+        });
+      }
 
       return res.status(201).json({
+        message: "Safety report submitted.",
         category,
-        safetyFlags: independentCount,
-        autoRestricted: thresholdReached,
-        restrictionScope: thresholdReached ? "NEW_EMERGENCY_REQUESTS_7_DAYS" : null,
+        autoRestricted,
+        restrictionScope: autoRestricted ? "NEW_EMERGENCY_REQUESTS_7_DAYS" : null,
       });
     } catch (err) {
       return next(err);
