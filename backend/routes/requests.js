@@ -226,34 +226,36 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
 
       const cleanMessage = message ? sanitizeText(message, 1000) : null;
 
-      // Max 3 OPEN requests per user
-      const openCount = await prisma.bloodRequest.count({
-        where: { requesterId: requester.id, status: "OPEN" },
-      });
-      if (openCount >= MAX_ACTIVE_REQUESTS_PER_USER) {
-        return res.status(400).json({
-          error: `You can have at most ${MAX_ACTIVE_REQUESTS_PER_USER} OPEN requests at one time.`,
-        });
-      }
-
       const code = `BR-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-      const created = await prisma.bloodRequest.create({
-        data: {
-          code,
-          requesterId: requester.id,
-          bloodGroup: bg,
-          hospital: cleanHospital,
-          city: cleanCity,
-          area: cleanArea,
-          radius: parsedRadius,
-          requiredDate: parsedDate.dateObj,
-          units: parsedUnits,
-          urgency: urgRaw,
-          contactPhone: sanitizeText(contactPhone, 30),
-          message: cleanMessage,
-          status: "OPEN",
-          closureReason: null,
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        // Lock requester row to serialize concurrent request creation per user
+        await tx.$executeRaw`SELECT id FROM users WHERE id = ${requester.id} FOR UPDATE`;
+        const openCount = await tx.bloodRequest.count({
+          where: { requesterId: requester.id, status: "OPEN" },
+        });
+        if (openCount >= MAX_ACTIVE_REQUESTS_PER_USER) {
+          const limitErr = new Error(`You can have at most ${MAX_ACTIVE_REQUESTS_PER_USER} OPEN requests at one time.`);
+          limitErr.status = 400;
+          throw limitErr;
+        }
+        return tx.bloodRequest.create({
+          data: {
+            code,
+            requesterId: requester.id,
+            bloodGroup: bg,
+            hospital: cleanHospital,
+            city: cleanCity,
+            area: cleanArea,
+            radius: parsedRadius,
+            requiredDate: parsedDate.dateObj,
+            units: parsedUnits,
+            urgency: urgRaw,
+            contactPhone: sanitizeText(contactPhone, 30),
+            message: cleanMessage,
+            status: "OPEN",
+            closureReason: null,
+          },
+        });
       });
 
       const matches = await findMatchingDonors(prisma, created);
@@ -368,6 +370,10 @@ function createRequestsRouter(prisma, { requestLimiter } = {}) {
       // Only the requester can decide
       if (item.requesterId !== viewer.id) {
         return res.status(403).json({ error: "Only the requester can approve or reject donors." });
+      }
+
+      if (item.status !== "OPEN") {
+        return res.status(409).json({ error: "This request is no longer open. Decisions are not allowed." });
       }
 
       const responseId = parsePositiveInt(req.params.responseId);

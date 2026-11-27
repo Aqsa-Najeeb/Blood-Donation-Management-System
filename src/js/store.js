@@ -1383,7 +1383,14 @@ function AppProvider({ children, defaultRoute }) {
     }
   };
 
-  const logoutUser = () => {
+  const logoutUser = async () => {
+    if (localStorage.getItem(TOKEN_KEY)) {
+      try {
+        await apiFetch("/api/auth/logout", { method: "POST" });
+      } catch {
+        // Proceed with local sign-out even if token already expired
+      }
+    }
     localStorage.removeItem(TOKEN_KEY);
     setUser((prev) => ({ ...prev, loggedIn: false }));
     showToast("Signed out safely.", "info");

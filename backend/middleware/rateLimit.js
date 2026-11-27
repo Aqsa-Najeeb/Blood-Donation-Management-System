@@ -3,6 +3,11 @@ function createRateLimiter({ windowMs = 60_000, max = 60, keyGenerator, message 
 
   return (req, res, next) => {
     const now = Date.now();
+    if (hits.size > 5000) {
+      for (const [k, v] of hits.entries()) {
+        if (v.resetAt <= now) hits.delete(k);
+      }
+    }
     const key = keyGenerator ? keyGenerator(req) : req.ip || req.socket?.remoteAddress || "unknown";
     const entry = hits.get(key);
 

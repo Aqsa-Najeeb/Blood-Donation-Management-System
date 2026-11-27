@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const { signToken, requireAuth } = require("../middleware/auth");
+const { signToken, requireAuth, extractBearer, revokeToken } = require("../middleware/auth");
 const { isDemoEmail } = require("../modules/demoStore");
 const { sanitizeUser } = require("../utils/serializers");
 const { now } = require("../utils/clock");
@@ -192,6 +192,13 @@ function createAuthRouter(prisma, { authLimiter } = {}) {
     } catch (err) {
       return next(err);
     }
+  });
+
+  // POST /api/auth/logout — revoke current bearer token
+  router.post("/logout", requireAuth, (req, res) => {
+    const token = extractBearer(req);
+    if (token) revokeToken(token);
+    return res.json({ message: "Logged out successfully." });
   });
 
   // GET /api/auth/me

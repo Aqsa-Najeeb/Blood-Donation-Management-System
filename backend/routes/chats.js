@@ -6,8 +6,20 @@ const { sanitizeUser } = require("../utils/serializers");
 const { sanitizeText } = require("../utils/validators");
 const { now } = require("../utils/clock");
 
-function createChatsRouter(prisma) {
+function createChatsRouter(prisma, { chatLimiter } = {}) {
   const router = express.Router();
+
+  async function ensureActiveCaller(req, res) {
+    const caller = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, deactivatedAt: true },
+    });
+    if (!caller || caller.deactivatedAt) {
+      res.status(401).json({ error: "Account not found or deactivated." });
+      return false;
+    }
+    return true;
+  }
 
   // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -39,8 +51,9 @@ function createChatsRouter(prisma) {
   }
 
   // ── POST /api/chats/invitations — send an invitation ─────────────────────
-  router.post("/invitations", requireAuth, async (req, res, next) => {
+  router.post("/invitations", requireAuth, ...(chatLimiter ? [chatLimiter] : []), async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const recipientId = Number(req.body?.recipientId);
       if (!recipientId || !Number.isInteger(recipientId) || recipientId <= 0) {
         return res.status(400).json({ error: "recipientId must be a positive integer." });
@@ -105,6 +118,7 @@ function createChatsRouter(prisma) {
   // ── GET /api/chats/invitations — list received + sent ────────────────────
   router.get("/invitations", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const [received, sent] = await Promise.all([
         prisma.chatInvitation.findMany({
           where: { recipientId: req.user.id },
@@ -136,6 +150,7 @@ function createChatsRouter(prisma) {
   // ── PATCH /api/chats/invitations/:id — ACCEPT / REJECT / RESTRICT ────────
   router.patch("/invitations/:id", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const id = Number(req.params.id);
       if (!id || !Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ error: "Invalid invitation id." });
@@ -201,6 +216,7 @@ function createChatsRouter(prisma) {
   // ── GET /api/chats — list user's conversations ────────────────────────────
   router.get("/", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const convs = await prisma.conversation.findMany({
         where: {
           OR: [{ userAId: req.user.id }, { userBId: req.user.id }],
@@ -221,6 +237,7 @@ function createChatsRouter(prisma) {
   // ── GET /api/chats/:conversationId — history ──────────────────────────────
   router.get("/:conversationId", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const convId = Number(req.params.conversationId);
       if (!convId || !Number.isInteger(convId) || convId <= 0) {
         return res.status(400).json({ error: "Invalid conversationId." });
@@ -257,8 +274,9 @@ function createChatsRouter(prisma) {
   });
 
   // ── POST /api/chats/:conversationId/messages — send a message ─────────────
-  router.post("/:conversationId/messages", requireAuth, async (req, res, next) => {
+  router.post("/:conversationId/messages", requireAuth, ...(chatLimiter ? [chatLimiter] : []), async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const convId = Number(req.params.conversationId);
       if (!convId || !Number.isInteger(convId) || convId <= 0) {
         return res.status(400).json({ error: "Invalid conversationId." });
@@ -305,6 +323,7 @@ function createChatsRouter(prisma) {
   // ── PATCH /api/chats/:conversationId/restrict — apply / remove restriction
   router.patch("/:conversationId/restrict", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const convId = Number(req.params.conversationId);
       if (!convId || !Number.isInteger(convId) || convId <= 0) {
         return res.status(400).json({ error: "Invalid conversationId." });

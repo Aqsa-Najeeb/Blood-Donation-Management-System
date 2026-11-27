@@ -57,6 +57,13 @@ function createDonorActionsRouter(prisma) {
   // GET /api/donor/alerts — strictly scoped to authenticated donor
   router.get("/alerts", requireAuth, async (req, res, next) => {
     try {
+      const caller = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, deactivatedAt: true },
+      });
+      if (!caller || caller.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
+      }
       await expireDueRequests(prisma);
       const alerts = await prisma.requestResponse.findMany({
         where: { donorId: req.user.id, donorResponse: { in: ["PENDING", "ACCEPTED"] } },

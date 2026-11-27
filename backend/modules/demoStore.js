@@ -2,7 +2,7 @@
 
 const express = require("express");
 const { isDemoModeEnabled } = require("../config/demoMode");
-const { requireAuth, signDemoToken } = require("../middleware/auth");
+const { requireAuth, signDemoToken, extractBearer, revokeToken } = require("../middleware/auth");
 const { sanitizeText, VALID_BLOOD_GROUPS, normalizeReportCategory } = require("../utils/validators");
 
 const DEMO_ACCOUNTS = [
@@ -190,6 +190,13 @@ function handleDemoRequest(req, res, store) {
 
   const path = req.path;
   const method = req.method.toUpperCase();
+
+  // /api/auth/logout
+  if (method === "POST" && path === "/auth/logout") {
+    const token = extractBearer(req);
+    if (token) revokeToken(token);
+    return res.json({ message: "Logged out successfully." });
+  }
 
   // /api/auth/me
   if (method === "GET" && path === "/auth/me") {

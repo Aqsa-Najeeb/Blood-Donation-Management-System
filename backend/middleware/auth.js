@@ -3,6 +3,34 @@ const { isDemoModeEnabled } = require("../config/demoMode");
 
 const DEV_FALLBACK_SECRET = "lifelink-dev-secret-change-in-production";
 
+// In-memory revoked token store (token -> expMs) for logout & account deactivation
+const revokedTokens = new Map();
+
+function pruneRevokedTokens() {
+  const nowMs = Date.now();
+  for (const [tok, expMs] of revokedTokens.entries()) {
+    if (expMs <= nowMs) revokedTokens.delete(tok);
+  }
+}
+
+function revokeToken(token) {
+  if (!token) return;
+  if (revokedTokens.size > 5000) pruneRevokedTokens();
+  const decoded = jwt.decode(token);
+  const expMs = decoded?.exp ? decoded.exp * 1000 : Date.now() + 7 * 24 * 60 * 60 * 1000;
+  revokedTokens.set(token, expMs);
+}
+
+function isTokenRevoked(token) {
+  const expMs = revokedTokens.get(token);
+  if (!expMs) return false;
+  if (expMs <= Date.now()) {
+    revokedTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   if (process.env.NODE_ENV === "production" && (!secret || secret.length < 32 || secret === DEV_FALLBACK_SECRET)) {
@@ -50,6 +78,9 @@ function extractBearer(req) {
 }
 
 function verifyToken(token) {
+  if (isTokenRevoked(token)) {
+    throw new Error("Token has been revoked");
+  }
   const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] });
   if (!decoded || !Number.isInteger(decoded.id) || decoded.id <= 0) {
     throw new Error("Malformed token payload");
@@ -101,6 +132,9 @@ function requireRole(...allowedRoles) {
 module.exports = {
   signToken,
   signDemoToken,
+  extractBearer,
+  revokeToken,
+  isTokenRevoked,
   requireAuth,
   optionalAuth,
   requireRole,

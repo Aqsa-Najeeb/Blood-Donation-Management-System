@@ -9,8 +9,20 @@ const { now } = require("../utils/clock");
 const ALLOWED_RADII = new Set([5, 10, 25, 50]);
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-function createDonorsRouter(prisma) {
+function createDonorsRouter(prisma, { contactLimiter } = {}) {
   const router = express.Router();
+
+  async function ensureActiveCaller(req, res) {
+    const caller = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, deactivatedAt: true },
+    });
+    if (!caller || caller.deactivatedAt) {
+      res.status(401).json({ error: "Account not found or deactivated." });
+      return false;
+    }
+    return true;
+  }
 
   // GET /api/donors/locations — static list of supported city/area pairs (D6)
   router.get("/locations", (_req, res) => {
@@ -48,6 +60,7 @@ function createDonorsRouter(prisma) {
   // GET /api/donors — authenticated donor search (FR-05, FR-06, BR-06, BR-17, BR-18, BR-19, NFR-04)
   router.get("/", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const { bloodGroup, city, area, radius } = req.query;
 
       let bgFilter = null;
@@ -137,6 +150,7 @@ function createDonorsRouter(prisma) {
   // GET /api/donors/:id — authenticated donor view (no phone/email)
   router.get("/:id", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const id = parsePositiveInt(req.params.id);
       if (!id) {
         return res.status(400).json({ error: "Invalid donor id." });
@@ -164,18 +178,19 @@ function createDonorsRouter(prisma) {
     }
   });
 
-  // POST /api/donors/:id/contact — reveal phone only to signed-in user (FR-07, BR-21)
-  router.post("/:id/contact", requireAuth, async (req, res, next) => {
+  // POST /api/donors/:id/contact — reveal phone only to signed-in user for available donors (FR-07, BR-21)
+  router.post("/:id/contact", requireAuth, ...(contactLimiter ? [contactLimiter] : []), async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const id = parsePositiveInt(req.params.id);
       if (!id) {
         return res.status(400).json({ error: "Invalid donor id." });
       }
       const donor = await prisma.user.findFirst({
-        where: { id, isDonor: true, deactivatedAt: null },
+        where: { id, isDonor: true, available: true, deactivatedAt: null },
       });
       if (!donor) {
-        return res.status(404).json({ error: "Donor not found." });
+        return res.status(404).json({ error: "Available donor not found." });
       }
       return res.json({
         donorId: donor.id,

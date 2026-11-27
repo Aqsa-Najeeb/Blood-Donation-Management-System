@@ -91,6 +91,18 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
     max: 10,
     message: "Too many subscription attempts.",
   });
+  const contactLimiter = skipRateLimiters ? null : createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 15,
+    keyGenerator: (req) => `contact:${req.user?.id || req.ip}`,
+    message: "Too many donor contact requests. Please wait before trying again.",
+  });
+  const chatLimiter = skipRateLimiters ? null : createRateLimiter({
+    windowMs: 60_000,
+    max: 60,
+    keyGenerator: (req) => `chat:${req.user?.id || req.ip}`,
+    message: "Too many chat requests. Please slow down.",
+  });
 
   if (apiLimiter) app.use("/api", apiLimiter);
 
@@ -124,11 +136,11 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
 
   // REST API Routes
   app.use("/api/auth", createAuthRouter(prisma, { authLimiter }));
-  app.use("/api/donors", createDonorsRouter(prisma));
+  app.use("/api/donors", createDonorsRouter(prisma, { contactLimiter }));
   app.use("/api/requests", createRequestsRouter(prisma, { requestLimiter }));
   app.use("/api/donor", createDonorActionsRouter(prisma));
-  app.use("/api/chats", createChatsRouter(prisma));
-  app.use("/api", createSettingsRouter(prisma, { reportLimiter, newsletterLimiter }));
+  app.use("/api/chats", createChatsRouter(prisma, { chatLimiter }));
+  app.use("/api", createSettingsRouter(prisma, { authLimiter, reportLimiter, newsletterLimiter }));
 
   // API 404 handler
   app.use("/api", (_req, res) => {

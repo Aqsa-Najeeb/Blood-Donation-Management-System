@@ -1,6 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, extractBearer, revokeToken } = require("../middleware/auth");
 const { sanitizeUser } = require("../utils/serializers");
 const { now } = require("../utils/clock");
 const {
@@ -27,8 +27,20 @@ const REPORT_THRESHOLD = 3;
 const RESTRICTION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORTER_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
-function createSettingsRouter(prisma, { reportLimiter } = {}) {
+function createSettingsRouter(prisma, { authLimiter, reportLimiter } = {}) {
   const router = express.Router();
+
+  async function ensureActiveCaller(req, res) {
+    const caller = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, deactivatedAt: true },
+    });
+    if (!caller || caller.deactivatedAt) {
+      res.status(401).json({ error: "Account not found or deactivated." });
+      return false;
+    }
+    return true;
+  }
 
   async function updateProfileHandler(req, res, next, { requireAllProfileFields = false } = {}) {
     try {
@@ -177,7 +189,7 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
   );
 
   // PUT /api/settings/password
-  router.put("/settings/password", requireAuth, async (req, res, next) => {
+  router.put("/settings/password", requireAuth, ...(authLimiter ? [authLimiter] : []), async (req, res, next) => {
     try {
       const { currentPassword, newPassword } = req.body || {};
       if (!currentPassword || !newPassword) {
@@ -191,8 +203,8 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
       }
 
       const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-      if (!user) {
-        return res.status(404).json({ error: "User not found." });
+      if (!user || user.deactivatedAt) {
+        return res.status(401).json({ error: "Account not found or deactivated." });
       }
 
       const match = await bcrypt.compare(String(currentPassword), user.passwordHash);
@@ -229,6 +241,8 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
           phone: "Deleted",
         },
       });
+      const token = extractBearer(req);
+      if (token) revokeToken(token);
       return res.json({ message: "Account deactivated and personal details anonymised." });
     } catch (err) {
       return next(err);
@@ -238,6 +252,7 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
   // GET /api/notifications — signed-in user's UNREAD items only
   router.get("/notifications", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const notifications = await prisma.notification.findMany({
         where: { userId: req.user.id, unread: true },
         orderBy: { createdAt: "desc" },
@@ -252,6 +267,7 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
   // POST /api/notifications/read — marks only the caller's items as read
   router.post("/notifications/read", requireAuth, async (req, res, next) => {
     try {
+      if (!(await ensureActiveCaller(req, res))) return;
       const result = await prisma.notification.updateMany({
         where: { userId: req.user.id, unread: true },
         data: { unread: false },
@@ -325,68 +341,76 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
         return res.status(404).json({ error: "Reported user not found." });
       }
 
-      const existingReport = await prisma.safetyReport.findFirst({
-        where: { targetUserId: targetId, reporterId: req.user.id },
-      });
-      if (existingReport) {
-        return res.status(409).json({
-          error: "You have already reported this account. Duplicate reports from the same user are not counted.",
+      const { autoRestricted } = await prisma.$transaction(async (tx) => {
+        // Lock target user row to serialize concurrent report counting & restriction creation
+        await tx.$executeRaw`SELECT id FROM users WHERE id = ${targetId} FOR UPDATE`;
+        const existingReport = await tx.safetyReport.findFirst({
+          where: { targetUserId: targetId, reporterId: req.user.id },
         });
-      }
+        if (existingReport) {
+          const dupErr = new Error(
+            "You have already reported this account. Duplicate reports from the same user are not counted."
+          );
+          dupErr.status = 409;
+          throw dupErr;
+        }
 
-      await prisma.safetyReport.create({
-        data: {
-          targetUserId: targetId,
-          reporterId: req.user.id,
-          category,
-          reason: cleanReason,
-          evidence: cleanEvidence,
-          createdAt: currentNow,
-        },
-      });
-
-      const latestRestriction = await prisma.restrictionRecord.findFirst({
-        where: { userId: targetId },
-        orderBy: { startsAt: "desc" },
-      });
-
-      const alreadyActive =
-        latestRestriction && currentNow.getTime() < new Date(latestRestriction.expiresAt).getTime();
-
-      const reportsSinceLastStart = await prisma.safetyReport.count({
-        where: {
-          targetUserId: targetId,
-          ...(latestRestriction ? { createdAt: { gt: latestRestriction.startsAt } } : {}),
-        },
-      });
-
-      let autoRestricted = Boolean(alreadyActive);
-      if (!alreadyActive && reportsSinceLastStart >= REPORT_THRESHOLD) {
-        const expiresAt = new Date(currentNow.getTime() + RESTRICTION_DURATION_MS);
-        await prisma.restrictionRecord.create({
+        await tx.safetyReport.create({
           data: {
-            userId: targetId,
-            reason:
-              "Automated precautionary restriction following 3 independent reports (not a verified finding).",
-            startsAt: currentNow,
-            expiresAt,
+            targetUserId: targetId,
+            reporterId: req.user.id,
+            category,
+            reason: cleanReason,
+            evidence: cleanEvidence,
             createdAt: currentNow,
           },
         });
-        await prisma.user.update({
-          where: { id: targetId },
-          data: {
-            safetyFlags: reportsSinceLastStart,
-            restrictedUntil: expiresAt,
+
+        const latestRestriction = await tx.restrictionRecord.findFirst({
+          where: { userId: targetId },
+          orderBy: { startsAt: "desc" },
+        });
+
+        const alreadyActive =
+          latestRestriction && currentNow.getTime() < new Date(latestRestriction.expiresAt).getTime();
+
+        const reportsSinceLastStart = await tx.safetyReport.count({
+          where: {
+            targetUserId: targetId,
+            ...(latestRestriction ? { createdAt: { gt: latestRestriction.startsAt } } : {}),
           },
         });
-        autoRestricted = true;
-      } else {
-        await prisma.user.update({
-          where: { id: targetId },
-          data: { safetyFlags: reportsSinceLastStart },
-        });
-      }
+
+        let restricted = Boolean(alreadyActive);
+        if (!alreadyActive && reportsSinceLastStart >= REPORT_THRESHOLD) {
+          const expiresAt = new Date(currentNow.getTime() + RESTRICTION_DURATION_MS);
+          await tx.restrictionRecord.create({
+            data: {
+              userId: targetId,
+              reason:
+                "Automated precautionary restriction following 3 independent reports (not a verified finding).",
+              startsAt: currentNow,
+              expiresAt,
+              createdAt: currentNow,
+            },
+          });
+          await tx.user.update({
+            where: { id: targetId },
+            data: {
+              safetyFlags: reportsSinceLastStart,
+              restrictedUntil: expiresAt,
+            },
+          });
+          restricted = true;
+        } else {
+          await tx.user.update({
+            where: { id: targetId },
+            data: { safetyFlags: reportsSinceLastStart },
+          });
+        }
+
+        return { autoRestricted: restricted };
+      });
 
       return res.status(201).json({
         message: "Safety report submitted.",
@@ -395,6 +419,11 @@ function createSettingsRouter(prisma, { reportLimiter } = {}) {
         restrictionScope: autoRestricted ? "NEW_EMERGENCY_REQUESTS_7_DAYS" : null,
       });
     } catch (err) {
+      if (err && err.code === "P2002") {
+        return res.status(409).json({
+          error: "You have already reported this account. Duplicate reports from the same user are not counted.",
+        });
+      }
       return next(err);
     }
   });
