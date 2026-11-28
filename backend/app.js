@@ -173,9 +173,14 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
     res.status(404).json({ error: "API endpoint not found." });
   });
 
-  // Serve Frontend static files
+  // Serve Frontend static assets with proper MIME types
+  app.use("/app", express.static(path.join(srcDir, "js")));
+  app.use("/js", express.static(path.join(srcDir, "js")));
   app.use(express.static(srcDir));
-  app.get(/^\/(?!api).*/, (_req, res) => {
+
+  // SPA navigation fallback: only routes WITHOUT a file extension receive index.html
+  // Never rewrite static asset requests (.css, .js, .svg, etc.) to index.html
+  app.get(/^(\/(?!api)[^\.]*)$/, (_req, res) => {
     res.sendFile(path.join(srcDir, "index.html"));
   });
 

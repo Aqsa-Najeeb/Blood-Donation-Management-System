@@ -4,6 +4,7 @@
   "description": "Life Link — Direct Verified Blood Exchange (Express REST API + Prisma + MySQL)",
   "main": "server.js",
   "scripts": {
+    "build": "npm run build:css",
     "build:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css",
     "watch:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css --watch",
     "start": "node server.js",

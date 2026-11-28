@@ -296,4 +296,59 @@ describe("Pre-Deployment Verification Suite", () => {
       assert.ok(!deps.includes(dis), `Unexpected integration dependency found: ${dis}`);
     }
   });
+
+  it("Static Asset Routing & MIME types: serves CSS, JS (/js & /app), SVG properly and never rewrites assets to HTML", async () => {
+    // 1. /output.css must return 200 with text/css MIME type
+    const cssRes = await request(app).get("/output.css");
+    assert.equal(cssRes.status, 200);
+    assert.match(cssRes.headers["content-type"], /text\/css/);
+    assert.ok(!cssRes.text.includes("<!DOCTYPE html>"));
+
+    // 2. /js/store.js must return 200 with javascript MIME type
+    const jsStoreRes = await request(app).get("/js/store.js");
+    assert.equal(jsStoreRes.status, 200);
+    assert.match(jsStoreRes.headers["content-type"], /(application|text)\/javascript/);
+    assert.ok(!jsStoreRes.text.includes("<!DOCTYPE html>"));
+
+    // 3. /app/store.js must return 200 with javascript MIME type
+    const appStoreRes = await request(app).get("/app/store.js");
+    assert.equal(appStoreRes.status, 200);
+    assert.match(appStoreRes.headers["content-type"], /(application|text)\/javascript/);
+    assert.ok(!appStoreRes.text.includes("<!DOCTYPE html>"));
+
+    // 4. /app/components.js must return 200 with javascript MIME type
+    const appCompRes = await request(app).get("/app/components.js");
+    assert.equal(appCompRes.status, 200);
+    assert.match(appCompRes.headers["content-type"], /(application|text)\/javascript/);
+    assert.ok(!appCompRes.text.includes("<!DOCTYPE html>"));
+
+    // 5. /assets/ SVG must return 200 with image/svg+xml MIME type
+    const svgRes = await request(app).get("/assets/3622e.svg");
+    assert.equal(svgRes.status, 200);
+    assert.match(svgRes.headers["content-type"], /image\/svg/);
+
+    // 6. SPA navigation routes without file extensions return index.html
+    const rootRes = await request(app).get("/");
+    assert.equal(rootRes.status, 200);
+    assert.match(rootRes.headers["content-type"], /text\/html/);
+    assert.ok(rootRes.text.includes("Life Link | Blood Donor Platform"));
+
+    const chatRouteRes = await request(app).get("/chat");
+    assert.equal(chatRouteRes.status, 200);
+    assert.match(chatRouteRes.headers["content-type"], /text\/html/);
+
+    // 7. Non-existent static files must return 404 and NEVER return index.html
+    const missingCss = await request(app).get("/nonexistent.css");
+    assert.equal(missingCss.status, 404);
+    assert.ok(!missingCss.text.includes("Life Link | Blood Donor Platform"));
+
+    const missingJs = await request(app).get("/nonexistent.js");
+    assert.equal(missingJs.status, 404);
+    assert.ok(!missingJs.text.includes("Life Link | Blood Donor Platform"));
+
+    // 8. API endpoints still reach backend serverless handlers
+    const apiRes = await request(app).get("/api/config");
+    assert.equal(apiRes.status, 200);
+    assert.match(apiRes.headers["content-type"], /application\/json/);
+  });
 });

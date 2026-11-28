@@ -6,24 +6,57 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/assets/(.*)",
-      "destination": "/src/assets/$1"
+      "source": "/output.css",
+      "destination": "/src/output.css"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/src/js/$1"
     },
     {
       "source": "/js/(.*)",
       "destination": "/src/js/$1"
     },
     {
-      "source": "/output.css",
-      "destination": "/src/output.css"
+      "source": "/assets/(.*)",
+      "destination": "/src/assets/$1"
     },
     {
       "source": "/find-donors.html",
       "destination": "/src/find-donors.html"
     },
     {
-      "source": "/((?!api|assets|js|output\\.css).*)",
+      "source": "/((?!api/|assets/|js/|app/|src/|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/src/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)\\.css",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.svg",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/svg+xml"
+        }
+      ]
     }
   ]
 }
