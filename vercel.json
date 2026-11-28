@@ -3,10 +3,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js?__vercel_path=$1"
-    },
-    {
       "source": "/find-donors.html",
       "destination": "/src/find-donors.html"
     },
