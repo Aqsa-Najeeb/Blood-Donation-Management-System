@@ -7,14 +7,16 @@ const PORT = process.env.PORT || 3000;
 const app = createApp(prisma);
 
 // Run expiry sweep once at startup and every 60 seconds (Decision D2)
-expireDueRequests(prisma).catch((err) => {
-  console.error("[Expiry Sweep Startup Error]", err);
-});
-setInterval(() => {
+if (prisma) {
   expireDueRequests(prisma).catch((err) => {
-    console.error("[Expiry Sweep Error]", err);
+    console.error("[Expiry Sweep Startup Error]", err);
   });
-}, 60_000);
+  setInterval(() => {
+    expireDueRequests(prisma).catch((err) => {
+      console.error("[Expiry Sweep Error]", err);
+    });
+  }, 60_000);
+}
 
 app.listen(PORT, () => {
   console.log(`Life Link Express REST API + Web Server running at http://localhost:${PORT}`);

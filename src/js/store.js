@@ -1131,8 +1131,12 @@ function AppProvider({ children, defaultRoute }) {
         } catch {
           // Ignore non-critical demo prefetch errors
         }
-        showToast(`Signed in to Demo Mode as ${res.user.name}.`);
-        navigate(role === "recipient" ? "/recipient-dashboard" : "/donor-dashboard");
+        showToast(`Switched to Demo Account: ${res.user.name}.`);
+        if (routeState.path === "/chat") {
+          setActiveConversationId(null);
+        } else if (routeState.path === "/login" || routeState.path === "/signup") {
+          navigate(res.user.isDonor ? "/donor-dashboard" : "/recipient-dashboard");
+        }
         return true;
       }
       return false;
@@ -1514,12 +1518,63 @@ function AppProvider({ children, defaultRoute }) {
             <div
               role="status"
               data-testid="demo-mode-banner"
-              className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-slate-950 text-center text-xs font-bold py-1.5 px-4 shadow-md tracking-wide"
+              className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-slate-950 text-xs font-bold py-1 px-4 shadow-md tracking-wide flex flex-wrap items-center justify-between gap-2"
             >
-              DEMO MODE — Isolated sample accounts &amp; data. Real records are never modified.
+              <div className="flex items-center gap-2">
+                <span className="bg-slate-950 text-amber-300 px-1.5 py-0.5 rounded text-[10px] tracking-wider uppercase font-black">
+                  DEMO MODE
+                </span>
+                <span className="hidden sm:inline">Isolated sample data. Real records are never modified.</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold">
+                <span className="opacity-80">
+                  {user.loggedIn ? `User: ${user.name}` : "Not signed in"}
+                </span>
+                <span className="opacity-40">|</span>
+                <span className="hidden md:inline">Switch:</span>
+                <button
+                  type="button"
+                  data-testid="demo-switch-donor"
+                  onClick={() => demoLogin("donor")}
+                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                    user.loggedIn && user.username === "demo.donor"
+                      ? "bg-slate-950 text-amber-300"
+                      : "bg-amber-600/70 hover:bg-slate-950 hover:text-amber-300 text-slate-950"
+                  }`}
+                  title="Switch to Demo Donor (Usman Khan, O+)"
+                >
+                  Usman (Donor)
+                </button>
+                <button
+                  type="button"
+                  data-testid="demo-switch-recipient"
+                  onClick={() => demoLogin("recipient")}
+                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                    user.loggedIn && user.username === "demo.recipient"
+                      ? "bg-slate-950 text-amber-300"
+                      : "bg-amber-600/70 hover:bg-slate-950 hover:text-amber-300 text-slate-950"
+                  }`}
+                  title="Switch to Demo Recipient (Farhan Malik)"
+                >
+                  Farhan (Recipient)
+                </button>
+                <button
+                  type="button"
+                  data-testid="demo-switch-ayesha"
+                  onClick={() => demoLogin("sample_donor")}
+                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                    user.loggedIn && user.username === "demo.ayesha"
+                      ? "bg-slate-950 text-amber-300"
+                      : "bg-amber-600/70 hover:bg-slate-950 hover:text-amber-300 text-slate-950"
+                  }`}
+                  title="Switch to Demo Donor (Ayesha Siddiqui, A+)"
+                >
+                  Ayesha (Donor)
+                </button>
+              </div>
             </div>
           )}
-          <div className={demoMode ? "pt-7" : ""}>{children}</div>
+          <div className={demoMode ? "pt-12 sm:pt-8" : ""}>{children}</div>
         </>
       )}
     </AppContext.Provider>

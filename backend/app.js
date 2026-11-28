@@ -110,18 +110,40 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
   // Health Check (no internal error leakage)
   app.get("/api/health", async (_req, res) => {
     try {
-      await prisma.$queryRaw`SELECT 1`;
-      return res.json({
-        status: "ok",
-        database: "mysql-connected",
-        timestamp: new Date().toISOString(),
-      });
+      if (prisma) {
+        await prisma.$queryRaw`SELECT 1`;
+        return res.json({
+          status: "ok",
+          database: "mysql-connected",
+          timestamp: new Date().toISOString(),
+        });
+      }
     } catch {
+      if (isDemoModeEnabled()) {
+        return res.json({
+          status: "demo-active",
+          database: "in-memory-demo",
+          timestamp: new Date().toISOString(),
+        });
+      }
       return res.status(503).json({
         status: "degraded",
         database: "mysql-disconnected",
       });
     }
+
+    if (isDemoModeEnabled()) {
+      return res.json({
+        status: "demo-active",
+        database: "in-memory-demo",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.status(503).json({
+      status: "degraded",
+      database: "mysql-disconnected",
+    });
   });
 
   // Public configuration endpoint (never exposes secrets or internal config)
@@ -134,8 +156,9 @@ function createApp(prisma, { skipRateLimiters = false } = {}) {
   });
 
   // Isolated Demo Mode middleware (only active when DEMO_MODE=true and NODE_ENV!==production)
-  const { router: demoRouter } = createDemoMiddleware();
+  const { router: demoRouter, reset: resetDemoStore } = createDemoMiddleware();
   app.use("/api", demoRouter);
+  app.resetDemoStore = resetDemoStore;
 
   // REST API Routes
   app.use("/api/auth", createAuthRouter(prisma, { authLimiter }));

@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/assets/(.*)",
+      "destination": "/src/assets/$1"
+    },
+    {
+      "source": "/js/(.*)",
+      "destination": "/src/js/$1"
+    },
+    {
+      "source": "/output.css",
+      "destination": "/src/output.css"
+    },
+    {
+      "source": "/find-donors.html",
+      "destination": "/src/find-donors.html"
+    },
+    {
+      "source": "/((?!api|assets|js|output\\.css).*)",
+      "destination": "/src/index.html"
+    }
+  ]
+}

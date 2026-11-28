@@ -19,6 +19,7 @@ window.LifeLinkAccountPages = (() => {
       showToast,
       setModal,
       user,
+      demoMode,
     } = useApp();
 
     const [tab, setTab] = useState("conversations");
@@ -143,6 +144,20 @@ window.LifeLinkAccountPages = (() => {
           <h1 className="text-2xl font-bold text-text">💬 Chats</h1>
           <div className="text-[12px] text-muted">Pair-based messaging</div>
         </div>
+
+        {demoMode && (
+          <div
+            data-testid="demo-chat-notice"
+            className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+          >
+            <span>
+              <strong>SIMULATED DEMO CHAT:</strong> Messages in demo mode are in-memory simulations for demonstration purposes only. They are not delivered to real external users.
+            </span>
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded self-start sm:self-auto shrink-0">
+              SIMULATED PERSPECTIVE
+            </span>
+          </div>
+        )}
 
         <div className="flex gap-2 text-[12px]">
           {[
@@ -740,20 +755,27 @@ window.LifeLinkAccountPages = (() => {
             {demoMode && (
               <>
                 <div className="text-center text-[12px] text-line">Or quick demo sign-in</div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => demoLogin("donor")}
-                    className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
+                    className="py-2.5 px-2 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-text cursor-pointer text-center"
                   >
-                    Demo Donor
+                    Usman (Donor)
                   </button>
                   <button
                     type="button"
                     onClick={() => demoLogin("recipient")}
-                    className="py-2.5 px-3 rounded-full bg-card hover:bg-cardhigh text-[12px] font-semibold text-text cursor-pointer"
+                    className="py-2.5 px-2 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-text cursor-pointer text-center"
                   >
-                    Demo Recipient
+                    Farhan (Recipient)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => demoLogin("sample_donor")}
+                    className="py-2.5 px-2 rounded-full bg-card hover:bg-cardhigh text-[11px] font-semibold text-text cursor-pointer text-center"
+                  >
+                    Ayesha (Donor)
                   </button>
                 </div>
               </>
